@@ -43,18 +43,33 @@
         <div class="container-fluid p-4" style="background-color: #FFF8E1;">
             <h2 style="color: #4E342E;"><i class="fa fa-envelope"></i> Contacto</h2>
             <hr>
-            <!-- TODO: Compañera - mejorar formulario y agregar datos de contacto -->
-            <form action="empresa.html">
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email:</label>
-                    <input type="email" class="form-control" id="email" placeholder="Tu email" name="email">
+            <div class="row">
+                <div class="col-12 col-md-8 mb-3">
+                    <h4 style="color: #6D4C41;">Envíanos un mensaje</h4>
+                    <form action="index.html">
+                        <div class="mb-3">
+                            <label for="nombre" class="form-label">Nombre:</label>
+                            <input type="text" class="form-control" id="nombre" placeholder="Tu nombre" name="nombre">
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email:</label>
+                            <input type="email" class="form-control" id="email" placeholder="Tu email" name="email">
+                        </div>
+                        <div class="mb-3">
+                            <label for="comment" class="form-label">Comentarios:</label>
+                            <textarea class="form-control" rows="5" id="comment" name="text"></textarea>
+                        </div>
+                        <button type="submit" class="btn" style="background-color: #4E342E; color: white;">Enviar</button>
+                    </form>
                 </div>
-                <div class="mb-3">
-                    <label for="comment" class="form-label">Comentarios:</label>
-                    <textarea class="form-control" rows="5" id="comment" name="text"></textarea>
+                <div class="col-12 col-md-4">
+                    <h4 style="color: #6D4C41;">Datos de contacto</h4>
+                    <p><i class="fa fa-map-marker" style="color: #6D4C41;"></i> Av. Providencia 1234, Santiago</p>
+                    <p><i class="fa fa-phone" style="color: #6D4C41;"></i> +56 9 1234 5678</p>
+                    <p><i class="fa fa-envelope" style="color: #6D4C41;"></i> contacto@dulcearoma.cl</p>
+                    <p><i class="fa fa-clock-o" style="color: #6D4C41;"></i> Lunes a Domingo, 8:00 - 20:00</p>
                 </div>
-                <button type="submit" class="btn" style="background-color: #4E342E; color: white;">Enviar</button>
-            </form>
+            </div>
             <hr>
             <a href="index.html" class="btn" style="background-color: #6D4C41; color: white;">Volver</a>
         </div>
