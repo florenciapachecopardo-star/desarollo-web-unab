@@ -23,16 +23,34 @@
                 mostrarProductos();
             }
 
-            // TODO: Compañera - implementar esta función
-            // Debe recorrer el array "productos" y mostrarlos en el div "listaProductos"
-            // usando elementos de Bootstrap (tabla o tarjetas) creados con createElement
-            function mostrarProductos() {
+                        function mostrarProductos() {
                 let lista = document.getElementById("listaProductos");
-                lista.innerHTML = "Por implementar";
+                lista.innerHTML = "";
+                let tabla = document.createElement("table");
+                tabla.setAttribute("class", "table table-striped");
+                let thead = document.createElement("thead");
+                thead.innerHTML = "<tr><th>ID</th><th>Nombre</th><th>Precio</th></tr>";
+                tabla.appendChild(thead);
+                let tbody = document.createElement("tbody");
+                productos.forEach((prod) => {
+                    let fila = document.createElement("tr");
+                    let tdId = document.createElement("td");
+                    tdId.innerText = prod.id;
+                    let tdNombre = document.createElement("td");
+                    tdNombre.innerText = prod.nombre;
+                    let tdPrecio = document.createElement("td");
+                    tdPrecio.innerText = prod.precio;
+                    fila.appendChild(tdId);
+                    fila.appendChild(tdNombre);
+                    fila.appendChild(tdPrecio);
+                    tbody.appendChild(fila);
+                });
+                tabla.appendChild(tbody);
+                lista.appendChild(tabla);
             }
         </script>
     </head>
-    <body>
+    <body onload="mostrarProductos();">
         <div class="container mt-3">
             <h2>Productos</h2>
             <hr>
@@ -44,7 +62,7 @@
             <input type="text" class="form-control mb-2" id="txtPrecio">
             <button type="button" class="btn btn-primary mb-3" onclick="agregarProducto();">Agregar</button>
             <hr>
-            <div id="listaProductos">Por implementar</div>
+            <div id="listaProductos"></div>
         </div>
     </body>
 </html>
