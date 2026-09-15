@@ -50,3 +50,11 @@ async def actualizar_sandwich(id: str, sandwich: SandwichUpdateModel):
         raise HTTPException(status_code=404, detail="Sandwich no encontrado")
     actualizado = await sandwiches_collection.find_one({"_id": ObjectId(id)})
     return sandwich_helper(actualizado)
+
+
+@app.delete("/sandwiches/{id}")
+async def eliminar_sandwich(id: str):
+    resultado = await sandwiches_collection.delete_one({"_id": ObjectId(id)})
+    if resultado.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Sandwich no encontrado")
+    return {"mensaje": "Sandwich eliminado correctamente"}
