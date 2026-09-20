@@ -12,13 +12,6 @@ async def inicio():
     return {"mensaje": "Gateway de Chocomanía funcionando"}
 
 
-@app.get("/api/sandwiches")
-async def sandwiches():
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{BOCATO_URL}/sandwiches")
-    return response.json()
-
-
 @app.get("/api/productos")
 async def productos():
     async with httpx.AsyncClient() as client:
