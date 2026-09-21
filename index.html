@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Chocomanía, chocolatería con delivery: barras rellenas, bombones y trufas.">
+    <title>Chocomanía | Chocolatería con delivery</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html" aria-current="page">Inicio</a></li>
+                <li><a href="index.html#productos">Categorías</a></li>
+                <li><a href="index.html#productos">Productos</a></li>
+                <li><a href="index.html#nosotros">Nosotros</a></li>
+                <li><a href="#">Regístrate</a></li>
+            </ul>
+        </nav>
+        <p class="carrito" id="carrito" role="status">Carrito (0)</p>
+    </header>
+
+    <main>
+        <h1 class="solo-lectores">Chocomanía, chocolatería con delivery</h1>
+        <img class="hero" src="img/hero.jpg" alt="Cacao, trufas, bombones y crema de chocolate. ChocoMania">
+
+        <section class="destacados" id="productos" aria-labelledby="titulo-destacados">
+            <h2 id="titulo-destacados">Productos destacados</h2>
+            <div class="grilla" id="grilla-productos"></div>
+        </section>
+
+        <section class="nosotros" id="nosotros" aria-label="Nosotros">
+            <img src="img/nosotros.jpg" alt="Mujer sonriente preparando chocolate junto a una pila de leña" width="316" height="237">
+            <p>
+                Somos una chocolatería con delivery. Elige entre barras rellenas, bombones y trufas,
+                y te los llevamos directo a tu casa.
+            </p>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <div class="pie__columnas">
+            <ul>
+                <li><a href="#">Contacto</a></li>
+                <li><a href="#">Redes sociales</a></li>
+                <li><a href="#">Tiendas</a></li>
+                <li><a href="#">Preguntas frecuentes</a></li>
+            </ul>
+            <ul>
+                <li><a href="#">Quiénes somos</a></li>
+                <li><a href="#">Despachos</a></li>
+                <li><a href="#">Cambios</a></li>
+                <li><a href="#">Devoluciones</a></li>
+            </ul>
+        </div>
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/productos.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/home.js"></script>
+</body>
+</html>

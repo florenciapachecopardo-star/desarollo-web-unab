@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Producto | Chocomanía</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="index.html#productos">Categorías</a></li>
+                <li><a href="index.html#productos" aria-current="page">Productos</a></li>
+                <li><a href="index.html#nosotros">Nosotros</a></li>
+                <li><a href="#">Regístrate</a></li>
+            </ul>
+        </nav>
+        <p class="carrito" id="carrito" role="status">Carrito (0)</p>
+    </header>
+
+    <main>
+        <section class="detalle" id="detalle">
+            <img class="detalle__foto" id="detalle-foto" alt="">
+            <div class="detalle__titulo">
+                <h1 id="detalle-nombre"></h1>
+                <p id="detalle-descripcion"></p>
+            </div>
+            <div class="detalle__acciones">
+                <p class="detalle__precio" id="detalle-precio"></p>
+                <button class="detalle__agregar" id="detalle-agregar" type="button">Agregar al carrito</button>
+            </div>
+            <p class="detalle__aviso" id="detalle-aviso" role="status"></p>
+        </section>
+
+        <section class="relacionados" id="relacionados" aria-labelledby="titulo-relacionados">
+            <h2 id="titulo-relacionados">Productos relacionados</h2>
+            <div class="grilla grilla--relacionados" id="grilla-relacionados"></div>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <div class="pie__columnas">
+            <ul>
+                <li><a href="#">Contacto</a></li>
+                <li><a href="#">Redes sociales</a></li>
+                <li><a href="#">Tiendas</a></li>
+                <li><a href="#">Preguntas frecuentes</a></li>
+            </ul>
+            <ul>
+                <li><a href="#">Quiénes somos</a></li>
+                <li><a href="#">Despachos</a></li>
+                <li><a href="#">Cambios</a></li>
+                <li><a href="#">Devoluciones</a></li>
+            </ul>
+        </div>
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/productos.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/producto.js"></script>
+</body>
+</html>
