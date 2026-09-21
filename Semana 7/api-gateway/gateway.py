@@ -3,7 +3,7 @@ import httpx
 
 app = FastAPI(title="Gateway Chocomanía")
 
-BOCATO_URL = "http://localhost:8001"
+PRODUCTOS_API_URL = "http://localhost:8001"
 USUARIOS_GRAPHQL_URL = "http://localhost:4000/graphql"
 
 
@@ -15,7 +15,7 @@ async def inicio():
 @app.get("/api/productos")
 async def productos():
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{BOCATO_URL}/sandwiches")
+        response = await client.get(f"{PRODUCTOS_API_URL}/productos")
     return response.json()
 
 
@@ -32,4 +32,3 @@ async def usuarios():
     async with httpx.AsyncClient() as client:
         response = await client.post(USUARIOS_GRAPHQL_URL, json={"query": query})
     return response.json()
-
