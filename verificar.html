@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verificar correo | Chocomanía</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="ayuda.html">Ayuda</a></li>
+            </ul>
+        </nav>
+        <span class="cuenta" id="cuenta-cabecera"></span>
+        <a class="carrito" id="carrito" href="carrito.html">Carrito (0)</a>
+    </header>
+
+    <main class="pagina">
+        <section class="tarjeta-form">
+            <h1>Verifica tu correo</h1>
+            <p class="tarjeta-form__intro">
+                Te enviamos un código a tu correo. Escríbelo para activar tu cuenta.
+            </p>
+
+            <div class="correo-simulado">
+                <p class="correo-simulado__aviso">
+                    Como esto es una demostración sin servidor, el correo no se envía de verdad.
+                    Este es el mensaje que habría llegado:
+                </p>
+                <div class="correo-simulado__cuerpo">
+                    <p><strong>De:</strong> Chocomanía</p>
+                    <p><strong>Asunto:</strong> Tu código de verificación</p>
+                    <p>Tu código es: <span class="correo-simulado__codigo" id="codigo-mostrado">------</span></p>
+                </div>
+            </div>
+
+            <form id="form-verificar" novalidate>
+                <div class="campo">
+                    <label for="codigo">Código de 6 dígitos</label>
+                    <input type="text" id="codigo" name="codigo" inputmode="numeric" maxlength="6" required>
+                </div>
+                <p class="form-error" id="error" role="alert"></p>
+                <button type="submit" class="boton">Verificar</button>
+            </form>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/datos.js"></script>
+    <script src="js/cuentas.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/verificar.js"></script>
+</body>
+</html>

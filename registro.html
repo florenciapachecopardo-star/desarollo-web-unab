@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Regístrate | Chocomanía</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="index.html#productos">Productos</a></li>
+                <li><a href="ayuda.html">Ayuda</a></li>
+                <li><a href="login.html">Ingresar</a></li>
+            </ul>
+        </nav>
+        <span class="cuenta" id="cuenta-cabecera"></span>
+        <a class="carrito" id="carrito" href="carrito.html">Carrito (0)</a>
+    </header>
+
+    <main class="pagina">
+        <section class="tarjeta-form tarjeta-form--ancha">
+            <h1>Crear cuenta</h1>
+            <p class="tarjeta-form__intro">Regístrate para comprar y recibir promociones. Los campos con * son obligatorios.</p>
+
+            <form id="form-registro" novalidate>
+                <div class="campos-grilla">
+                    <div class="campo">
+                        <label for="run">RUN *</label>
+                        <input type="text" id="run" name="run" placeholder="12.345.678-9" required>
+                        <span class="campo__error" data-error="run"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="nombre">Nombre completo *</label>
+                        <input type="text" id="nombre" name="nombre" autocomplete="name" required>
+                        <span class="campo__error" data-error="nombre"></span>
+                    </div>
+                    <div class="campo campo--ancho">
+                        <label for="direccion">Dirección *</label>
+                        <input type="text" id="direccion" name="direccion" autocomplete="street-address" required>
+                        <span class="campo__error" data-error="direccion"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="region">Región *</label>
+                        <select id="region" name="region" required>
+                            <option value="">Elige una región</option>
+                        </select>
+                        <span class="campo__error" data-error="region"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="provincia">Provincia *</label>
+                        <select id="provincia" name="provincia" required disabled>
+                            <option value="">Elige una provincia</option>
+                        </select>
+                        <span class="campo__error" data-error="provincia"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="comuna">Comuna *</label>
+                        <select id="comuna" name="comuna" required disabled>
+                            <option value="">Elige una comuna</option>
+                        </select>
+                        <span class="campo__error" data-error="comuna"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="nacimiento">Fecha de nacimiento *</label>
+                        <input type="date" id="nacimiento" name="nacimiento" required>
+                        <span class="campo__error" data-error="nacimiento"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="sexo">Sexo *</label>
+                        <select id="sexo" name="sexo" required>
+                            <option value="">Elige una opción</option>
+                            <option value="F">Femenino</option>
+                            <option value="M">Masculino</option>
+                            <option value="O">Otro</option>
+                        </select>
+                        <span class="campo__error" data-error="sexo"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="correo">Correo *</label>
+                        <input type="email" id="correo" name="correo" autocomplete="email" required>
+                        <span class="campo__error" data-error="correo"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="telefono">Teléfono *</label>
+                        <input type="tel" id="telefono" name="telefono" placeholder="+56912345678" required>
+                        <span class="campo__error" data-error="telefono"></span>
+                    </div>
+                    <div class="campo">
+                        <label for="clave">Contraseña *</label>
+                        <input type="password" id="clave" name="clave" autocomplete="new-password" required>
+                        <span class="campo__error" data-error="clave"></span>
+                    </div>
+                </div>
+
+                <p class="form-error" id="error-general" role="alert"></p>
+
+                <button type="submit" class="boton">Crear cuenta</button>
+            </form>
+
+            <p class="tarjeta-form__pie">¿Ya tienes cuenta? <a href="login.html">Ingresa aquí</a>.</p>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/datos.js"></script>
+    <script src="js/cuentas.js"></script>
+    <script src="js/geografia.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/registro.js"></script>
+</body>
+</html>

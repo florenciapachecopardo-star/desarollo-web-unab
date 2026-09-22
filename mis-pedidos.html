@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mis pedidos | Chocomanía</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="index.html#productos">Productos</a></li>
+                <li><a href="ayuda.html">Ayuda</a></li>
+                <li><a href="carrito.html">Carrito</a></li>
+            </ul>
+        </nav>
+        <span class="cuenta" id="cuenta-cabecera"></span>
+        <a class="carrito" id="carrito" href="carrito.html">Carrito (0)</a>
+    </header>
+
+    <main class="pagina">
+        <h1>Mis pedidos</h1>
+        <div id="lista-pedidos"></div>
+    </main>
+
+    <footer class="pie">
+        <div class="pie__columnas">
+            <ul>
+                <li><a href="contacto.html">Contacto</a></li>
+                <li><a href="ubicacion.html">Tiendas</a></li>
+                <li><a href="ayuda.html">Preguntas frecuentes</a></li>
+                <li><a href="ayuda.html?tema=despachos">Despachos</a></li>
+            </ul>
+            <ul>
+                <li><a href="index.html#nosotros">Quiénes somos</a></li>
+                <li><a href="carrito.html">Tu carrito</a></li>
+                <li><a href="mis-pedidos.html">Mis pedidos</a></li>
+                <li><a href="login.html">Acceso del personal</a></li>
+            </ul>
+        </div>
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/datos.js"></script>
+    <script src="js/cuentas.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/pedidos.js"></script>
+    <script src="js/mis-pedidos.js"></script>
+</body>
+</html>
