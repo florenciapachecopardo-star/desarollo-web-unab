@@ -1,10 +1,22 @@
-from fastapi import FastAPI, HTTPException
+import os
+import secrets
+from fastapi import FastAPI, HTTPException, Header, Depends
 from bson import ObjectId
 
 from database import productos_collection
 from models import ProductoModel, ProductoUpdateModel
 
 app = FastAPI(title="Chocomanía API - FastAPI & MongoDB")
+
+INTERNAL_GATEWAY_SECRET = os.getenv("INTERNAL_GATEWAY_SECRET")
+if not INTERNAL_GATEWAY_SECRET:
+    raise RuntimeError("INTERNAL_GATEWAY_SECRET no esta configurado")
+
+
+def verify_gateway(x_gateway_secret: str = Header(default="")):
+    valid = secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET)
+    if not valid:
+        raise HTTPException(status_code=403, detail="Solicitud no autorizada desde Gateway")
 
 
 def producto_helper(producto) -> dict:
@@ -17,7 +29,12 @@ def producto_helper(producto) -> dict:
     }
 
 
-@app.get("/productos")
+@app.get("/health")
+def health():
+    return {"status": "OK"}
+
+
+@app.get("/productos", dependencies=[Depends(verify_gateway)])
 async def consultar_productos():
     productos = []
     async for producto in productos_collection.find():
@@ -25,7 +42,7 @@ async def consultar_productos():
     return productos
 
 
-@app.get("/productos/{id}")
+@app.get("/productos/{id}", dependencies=[Depends(verify_gateway)])
 async def consultar_producto_por_id(id: str):
     producto = await productos_collection.find_one({"_id": ObjectId(id)})
     if producto is None:
@@ -33,14 +50,14 @@ async def consultar_producto_por_id(id: str):
     return producto_helper(producto)
 
 
-@app.post("/productos", status_code=201)
+@app.post("/productos", status_code=201, dependencies=[Depends(verify_gateway)])
 async def insertar_producto(producto: ProductoModel):
     nuevo_producto = await productos_collection.insert_one(producto.dict())
     creado = await productos_collection.find_one({"_id": nuevo_producto.inserted_id})
     return producto_helper(creado)
 
 
-@app.put("/productos/{id}")
+@app.put("/productos/{id}", dependencies=[Depends(verify_gateway)])
 async def actualizar_producto(id: str, producto: ProductoUpdateModel):
     datos = {k: v for k, v in producto.dict().items() if v is not None}
     if len(datos) == 0:
@@ -52,7 +69,7 @@ async def actualizar_producto(id: str, producto: ProductoUpdateModel):
     return producto_helper(actualizado)
 
 
-@app.delete("/productos/{id}")
+@app.delete("/productos/{id}", dependencies=[Depends(verify_gateway)])
 async def eliminar_producto(id: str):
     resultado = await productos_collection.delete_one({"_id": ObjectId(id)})
     if resultado.deleted_count == 0:
