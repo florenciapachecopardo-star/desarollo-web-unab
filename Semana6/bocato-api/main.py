@@ -19,6 +19,12 @@ def verify_gateway(x_gateway_secret: str = Header(default="")):
         raise HTTPException(status_code=403, detail="Solicitud no autorizada desde Gateway")
 
 
+def verify_admin(x_authenticated_roles: str = Header(default="")):
+    roles = x_authenticated_roles.split(",")
+    if "admin" not in roles:
+        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+
+
 def producto_helper(producto) -> dict:
     return {
         "id": str(producto["_id"]),
@@ -69,7 +75,7 @@ async def actualizar_producto(id: str, producto: ProductoUpdateModel):
     return producto_helper(actualizado)
 
 
-@app.delete("/productos/{id}", dependencies=[Depends(verify_gateway)])
+@app.delete("/productos/{id}", dependencies=[Depends(verify_gateway), Depends(verify_admin)])
 async def eliminar_producto(id: str):
     resultado = await productos_collection.delete_one({"_id": ObjectId(id)})
     if resultado.deleted_count == 0:
