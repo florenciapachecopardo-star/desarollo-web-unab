@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ingresar | Chocomanía</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="cabecera">
+        <a class="marca" href="index.html">Chocomanía</a>
+        <nav class="menu" aria-label="Principal">
+            <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="index.html#productos">Productos</a></li>
+                <li><a href="ayuda.html">Ayuda</a></li>
+                <li><a href="registro.html">Regístrate</a></li>
+            </ul>
+        </nav>
+        <span class="cuenta" id="cuenta-cabecera"></span>
+        <a class="carrito" id="carrito" href="carrito.html">Carrito (0)</a>
+    </header>
+
+    <main class="pagina">
+        <section class="tarjeta-form">
+            <h1>Ingresar</h1>
+            <p class="tarjeta-form__intro">Ingresa con tu cuenta de cliente o con una cuenta del personal.</p>
+
+            <form id="form-login" novalidate>
+                <div class="campo">
+                    <label for="correo">Correo</label>
+                    <input type="email" id="correo" name="correo" autocomplete="email" required>
+                </div>
+                <div class="campo">
+                    <label for="clave">Contraseña</label>
+                    <input type="password" id="clave" name="clave" autocomplete="current-password" required>
+                </div>
+
+                <p class="form-error" id="error" role="alert"></p>
+
+                <button type="submit" class="boton">Ingresar</button>
+            </form>
+
+            <p class="tarjeta-form__pie">¿No tienes cuenta? <a href="registro.html">Regístrate aquí</a>.</p>
+
+            <details class="cuentas-prueba">
+                <summary>Cuentas de prueba</summary>
+                <p>Haz clic en una para completar el formulario.</p>
+                <ul id="lista-cuentas"></ul>
+            </details>
+        </section>
+    </main>
+
+    <footer class="pie">
+        <p class="pie__copy">© Chocomanía</p>
+    </footer>
+
+    <script src="js/datos.js"></script>
+    <script src="js/cuentas.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/carrito.js"></script>
+    <script src="js/login.js"></script>
+</body>
+</html>

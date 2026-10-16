@@ -1,10 +1,18 @@
-function obtenerProducto() {
+// Ficha de producto. Lee el id desde ?id= y muestra el producto desde el
+// catálogo. Los relacionados son los de la misma categoría.
+
+function obtenerProductoActual() {
     const parametro = new URLSearchParams(window.location.search).get("id");
-    const id = parametro === null ? PRODUCTOS[0].id : Number(parametro);
-    return buscarProducto(id);
+    const productos = obtenerProductos();
+    if (parametro === null) {
+        return productos[0];
+    }
+    return buscarProducto(parametro);
 }
 
 function mostrarNoEncontrado() {
+    const detalle = document.getElementById("detalle");
+
     const titulo = document.createElement("h1");
     titulo.textContent = "Producto no encontrado";
 
@@ -16,8 +24,8 @@ function mostrarNoEncontrado() {
     enlace.href = "index.html#productos";
     enlace.textContent = "Ver productos";
 
-    document.getElementById("detalle").replaceChildren(titulo, texto, enlace);
-    document.getElementById("detalle").classList.add("detalle--vacio");
+    detalle.replaceChildren(titulo, texto, enlace);
+    detalle.classList.add("detalle--vacio");
     document.getElementById("relacionados").hidden = true;
 }
 
@@ -56,13 +64,20 @@ function mostrarProducto(producto) {
 
 function mostrarRelacionados(producto) {
     const grilla = document.getElementById("grilla-relacionados");
-    PRODUCTOS
-        .filter((otro) => otro.id !== producto.id)
-        .forEach((otro) => grilla.appendChild(crearTarjeta(otro)));
+    const relacionados = obtenerProductos().filter(
+        (otro) => otro.id !== producto.id && otro.categoria === producto.categoria
+    );
+
+    if (relacionados.length === 0) {
+        document.getElementById("relacionados").hidden = true;
+        return;
+    }
+
+    relacionados.forEach((otro) => grilla.appendChild(crearTarjeta(otro)));
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    const producto = obtenerProducto();
+    const producto = obtenerProductoActual();
 
     if (producto) {
         mostrarProducto(producto);
@@ -70,6 +85,4 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         mostrarNoEncontrado();
     }
-
-    iniciarCarrito();
 });

@@ -428,3 +428,738 @@ button:focus-visible {
         transition: none !important;
     }
 }
+
+/* ===== Añadidos: cuenta, categorías, tarjetas con botón, formularios ===== */
+
+/* --- Cuenta en la cabecera --- */
+.cuenta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.cuenta a {
+    color: #fff;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    padding: 6px 0;
+}
+
+.cuenta a:hover {
+    border-bottom-color: var(--crema);
+}
+
+.cuenta__salir {
+    font-family: inherit;
+    font-size: 1rem;
+    color: var(--crema);
+    background: none;
+    border: 1px solid var(--crema);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+.cuenta__salir:hover {
+    background: rgba(243, 226, 207, 0.15);
+}
+
+.carrito {
+    text-decoration: none;
+}
+
+.carrito:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+/* --- Menú de categorías --- */
+.categorias {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 16px;
+    margin: 0 0 clamp(28px, 4vw, 44px);
+}
+
+.categorias a {
+    padding: 8px 18px;
+    color: #fff;
+    text-decoration: none;
+    background: var(--caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 999px;
+}
+
+.categorias a:hover,
+.categorias a[aria-current="page"] {
+    background: var(--crema);
+    color: var(--tinta);
+}
+
+.grilla__vacio {
+    width: 100%;
+    text-align: center;
+    color: var(--crema);
+}
+
+/* --- Tarjeta ahora es contenedor de enlace + botón --- */
+.tarjeta__enlace {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    color: #fff;
+    text-decoration: none;
+}
+
+.tarjeta--agotado .tarjeta__foto {
+    opacity: 0.55;
+}
+
+.tarjeta__agregar {
+    margin-top: 12px;
+    padding: 8px 20px;
+    font-family: inherit;
+    font-size: 1.05rem;
+    color: var(--tinta);
+    background: var(--crema);
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.1s ease, background-color 0.15s ease;
+}
+
+.tarjeta__agregar:hover {
+    background: #efdcc6;
+}
+
+.tarjeta__agregar:active {
+    transform: scale(0.97);
+}
+
+.tarjeta__estado {
+    margin-top: 12px;
+    padding: 6px 18px;
+    font-size: 1rem;
+    color: var(--crema);
+    border: 1px solid var(--crema);
+    border-radius: 999px;
+}
+
+/* --- Páginas con formulario (login, registro, verificar) --- */
+.pagina {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: clamp(32px, 5vw, 64px) clamp(20px, 4vw, 56px) clamp(56px, 8vw, 96px);
+}
+
+.tarjeta-form {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: clamp(28px, 4vw, 44px);
+    background: var(--caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 24px;
+}
+
+.tarjeta-form--ancha {
+    max-width: 760px;
+}
+
+.tarjeta-form h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    font-weight: 400;
+}
+
+.tarjeta-form__intro {
+    margin: 0 0 24px;
+    color: var(--crema);
+}
+
+.tarjeta-form__pie {
+    margin: 20px 0 0;
+    color: var(--crema);
+}
+
+.tarjeta-form__pie a,
+.tarjeta-form a {
+    color: #fff;
+}
+
+.campos-grilla {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 24px;
+}
+
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 18px;
+}
+
+.campos-grilla .campo {
+    margin-bottom: 0;
+}
+
+.campo--ancho {
+    grid-column: 1 / -1;
+}
+
+.campo label {
+    font-size: 1.05rem;
+    color: var(--crema);
+}
+
+.campo input,
+.campo select {
+    font-family: inherit;
+    font-size: 1.05rem;
+    padding: 10px 14px;
+    color: var(--tinta);
+    background: var(--gris-caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 10px;
+}
+
+.campo input:focus-visible,
+.campo select:focus-visible {
+    outline: 3px solid var(--crema);
+    outline-offset: 2px;
+}
+
+.campo select:disabled {
+    opacity: 0.6;
+}
+
+.campo__error {
+    min-height: 1.1em;
+    font-size: 0.95rem;
+    color: #ffd0d0;
+}
+
+.form-error {
+    min-height: 1.2em;
+    margin: 4px 0 16px;
+    color: #ffd0d0;
+}
+
+.boton {
+    display: inline-block;
+    width: 100%;
+    padding: 13px 20px;
+    font-family: inherit;
+    font-size: 1.2rem;
+    text-align: center;
+    color: var(--tinta);
+    background: var(--crema);
+    border: 0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.boton:hover {
+    background: #efdcc6;
+}
+
+.boton:active {
+    transform: scale(0.99);
+}
+
+/* --- Cuentas de prueba en el login --- */
+.cuentas-prueba {
+    margin-top: 24px;
+    color: var(--crema);
+}
+
+.cuentas-prueba summary {
+    cursor: pointer;
+}
+
+.cuentas-prueba ul {
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.enlace-boton {
+    font-family: inherit;
+    font-size: 1rem;
+    color: #fff;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+/* --- Correo simulado (verificación y boleta) --- */
+.correo-simulado {
+    margin: 0 0 24px;
+    padding: 16px 18px;
+    background: var(--gris-caja);
+    color: var(--tinta);
+    border-radius: 14px;
+}
+
+.correo-simulado__aviso {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+}
+
+.correo-simulado__cuerpo p {
+    margin: 4px 0;
+}
+
+.correo-simulado__codigo {
+    font-size: 1.6rem;
+    letter-spacing: 4px;
+}
+
+@media (max-width: 560px) {
+    .campos-grilla {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Añadidos etapa 2: carrito, compra, boleta, pedidos ===== */
+
+.pagina h1 {
+    font-weight: 400;
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    margin: 0 0 20px;
+}
+
+.boton--secundario {
+    color: #fff;
+    background: var(--caja);
+    border: 1px solid var(--borde-foto);
+}
+
+.boton--secundario:hover {
+    background: #6b1520;
+}
+
+.boton--peligro {
+    color: #fff;
+    background: #7a1a1a;
+}
+
+.enlace-boton--peligro {
+    color: #ffb4b4;
+}
+
+.form-exito {
+    min-height: 1.2em;
+    color: #b7e5c4;
+}
+
+/* --- Tabla del carrito --- */
+.tabla-carrito,
+.tabla-boleta {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 20px;
+}
+
+.tabla-carrito th,
+.tabla-carrito td,
+.tabla-boleta th,
+.tabla-boleta td {
+    padding: 12px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--borde-foto);
+}
+
+.tabla-carrito thead th,
+.tabla-boleta thead th {
+    color: var(--crema);
+    font-weight: 400;
+}
+
+.cantidad {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cantidad__boton {
+    width: 34px;
+    height: 34px;
+    font-family: inherit;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--tinta);
+    background: var(--crema);
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.cantidad__num {
+    min-width: 1.5em;
+    text-align: center;
+}
+
+.carrito-total {
+    text-align: right;
+    font-size: 1.4rem;
+    color: var(--crema);
+}
+
+.carrito-acciones,
+.boleta-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    justify-content: flex-end;
+}
+
+.carrito-acciones .boton,
+.boleta-acciones .boton {
+    width: auto;
+}
+
+.carrito-vacio {
+    color: var(--crema);
+    margin-bottom: 18px;
+}
+
+/* --- Resumen de compra (checkout) --- */
+.resumen-compra {
+    margin: 0 0 24px;
+    padding: 16px 18px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 14px;
+}
+
+.resumen-compra__lista {
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.resumen-compra__lista li {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.resumen-compra__total {
+    margin: 0;
+    text-align: right;
+    font-size: 1.3rem;
+    color: var(--crema);
+}
+
+/* --- Grupos de opciones (entrega y pago) --- */
+.grupo {
+    margin: 0 0 22px;
+    padding: 16px 18px;
+    border: 1px solid var(--borde-foto);
+    border-radius: 14px;
+}
+
+.grupo legend {
+    padding: 0 8px;
+    color: var(--crema);
+}
+
+.grupo__nota {
+    margin: 8px 0 0;
+    font-size: 0.95rem;
+    color: var(--crema);
+}
+
+.opcion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    cursor: pointer;
+}
+
+.opcion input {
+    width: 20px;
+    height: 20px;
+}
+
+/* --- Pasarela de pago simulada --- */
+.pasarela {
+    margin: 0 0 20px;
+    padding: 20px;
+    background: var(--gris-caja);
+    color: var(--tinta);
+    border-radius: 14px;
+}
+
+.pasarela p {
+    margin: 6px 0;
+}
+
+.pasarela__aviso {
+    font-size: 0.95rem;
+}
+
+.pasarela__monto {
+    font-size: 2rem;
+    text-align: center;
+}
+
+/* --- Boleta --- */
+.boleta {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    padding: clamp(24px, 4vw, 40px);
+    background: #fff;
+    color: var(--tinta);
+    border-radius: 12px;
+}
+
+.boleta__cabecera {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--tinta);
+}
+
+.boleta__marca {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+.boleta__numero {
+    text-align: right;
+}
+
+.boleta__cliente {
+    margin-bottom: 18px;
+}
+
+.boleta__cliente p {
+    margin: 4px 0;
+}
+
+.boleta .tabla-boleta th,
+.boleta .tabla-boleta td {
+    border-bottom: 1px solid #ccc;
+}
+
+.boleta__totales {
+    margin-top: 16px;
+    margin-left: auto;
+    max-width: 280px;
+}
+
+.boleta__totales p {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0;
+}
+
+.boleta__total {
+    font-size: 1.3rem;
+    border-top: 2px solid var(--tinta);
+    padding-top: 8px;
+}
+
+/* --- Tarjetas de pedido (mis pedidos) --- */
+.pedido {
+    margin: 0 0 18px;
+    padding: 18px 20px;
+    background: var(--caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 16px;
+}
+
+.pedido__cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.pedido__numero {
+    font-size: 1.3rem;
+}
+
+.pedido__estado {
+    padding: 4px 12px;
+    font-size: 0.95rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.pedido__estado--pagado,
+.pedido__estado--despachado {
+    background: #1f5c3a;
+}
+
+.pedido__estado--anulado {
+    background: #7a1a1a;
+}
+
+.pedido__estado--pendiente_pago,
+.pedido__estado--por_confirmar {
+    background: #8a6d1a;
+}
+
+.pedido__productos {
+    color: var(--crema);
+}
+
+.pedido__motivo {
+    font-size: 0.95rem;
+    color: #ffd0d0;
+}
+
+.pedido__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 8px;
+}
+
+.form-anular {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--borde-foto);
+    display: grid;
+    gap: 8px;
+}
+
+.form-anular textarea {
+    font-family: inherit;
+    font-size: 1.05rem;
+    padding: 10px 14px;
+    color: var(--tinta);
+    background: var(--gris-caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 10px;
+}
+
+.form-anular__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.form-anular__acciones .boton {
+    width: auto;
+}
+
+/* --- Ubicación y FAQ --- */
+.info-tienda {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: stretch;
+}
+
+.info-tienda__datos p {
+    margin: 8px 0;
+}
+
+.info-tienda__mapa {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    color: var(--crema);
+    background: var(--caja);
+    border: 1px dashed var(--crema);
+    border-radius: 16px;
+}
+
+.faq {
+    margin: 0 0 12px;
+    padding: 14px 18px;
+    background: var(--caja);
+    border: 1px solid var(--borde-foto);
+    border-radius: 14px;
+}
+
+.faq summary {
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.faq p {
+    margin: 10px 0 0;
+    color: var(--crema);
+}
+
+@media (max-width: 700px) {
+    .info-tienda {
+        grid-template-columns: 1fr;
+    }
+
+    /* Tablas apiladas en celular */
+    .tabla-carrito thead {
+        display: none;
+    }
+
+    .tabla-carrito,
+    .tabla-carrito tbody,
+    .tabla-carrito tr,
+    .tabla-carrito td {
+        display: block;
+        width: 100%;
+    }
+
+    .tabla-carrito tr {
+        margin-bottom: 16px;
+        border: 1px solid var(--borde-foto);
+        border-radius: 12px;
+        padding: 6px 12px;
+    }
+
+    .tabla-carrito td {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border: 0;
+        padding: 8px 0;
+    }
+
+    .tabla-carrito td::before {
+        content: attr(data-titulo);
+        color: var(--crema);
+    }
+
+    .tabla-carrito td:last-child::before {
+        content: "";
+    }
+}
+
+/* --- Impresión de la boleta --- */
+@media print {
+    .cabecera,
+    .pie,
+    .boleta-acciones,
+    #aviso-correo {
+        display: none !important;
+    }
+
+    body {
+        background: #fff;
+        color: #000;
+    }
+
+    .boleta {
+        border: 0;
+    }
+}
