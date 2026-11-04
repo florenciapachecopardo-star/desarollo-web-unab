@@ -1,0 +1,105 @@
+name: chocomania
+
+# Red publica: solo el gateway (unico puerto expuesto al computador).
+# Red privada (internal): servicios internos, sin salida ni entrada desde fuera.
+networks:
+  publica:
+  privada:
+    internal: true
+
+volumes:
+  mongo-data:
+
+x-healthcheck-python: &healthcheck-python
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+  interval: 5s
+  timeout: 3s
+  retries: 10
+
+services:
+  vault:
+    image: hashicorp/vault:1.17.6
+    command: ["server", "-dev"]
+    cap_add: ["IPC_LOCK"]
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_ROOT_TOKEN:?Falta VAULT_ROOT_TOKEN en .env}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    networks: [privada]
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # Carga los secretos y crea el token de solo lectura del gateway.
+  # Corre una vez y termina (Vault en modo dev pierde todo al reiniciarse).
+  vault-init:
+    image: hashicorp/vault:1.17.6
+    entrypoint: ["sh", "/vault-init.sh"]
+    volumes:
+      - ./scripts/vault-init.sh:/vault-init.sh:ro
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_ROOT_TOKEN}
+      GATEWAY_VAULT_TOKEN: ${GATEWAY_VAULT_TOKEN:?Falta GATEWAY_VAULT_TOKEN en .env}
+      GATEWAY_INVENTORY_SECRET: ${GATEWAY_INVENTORY_SECRET:?Falta GATEWAY_INVENTORY_SECRET en .env}
+      AUTH_INTROSPECTION_SECRET: ${AUTH_INTROSPECTION_SECRET:?Falta AUTH_INTROSPECTION_SECRET en .env}
+    networks: [privada]
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  mongo:
+    image: mongo:7.0.14
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?Falta MONGO_ROOT_USER en .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Falta MONGO_ROOT_PASSWORD en .env}
+    volumes:
+      - mongo-data:/data/db
+    networks: [privada]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  auth:
+    build: ./backend/auth
+    image: chocomania-auth:dev
+    environment:
+      AUTH_INTROSPECTION_SECRET: ${AUTH_INTROSPECTION_SECRET}
+    networks: [privada]
+    healthcheck: *healthcheck-python
+
+  inventory:
+    build: ./backend/inventory
+    image: chocomania-inventory:dev
+    environment:
+      INTERNAL_GATEWAY_SECRET: ${GATEWAY_INVENTORY_SECRET}
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+    networks: [privada]
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck: *healthcheck-python
+
+  gateway:
+    build: ./backend/gateway
+    image: chocomania-gateway:dev
+    ports:
+      - "8000:8000"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${GATEWAY_VAULT_TOKEN}
+      AUTH_URL: http://auth:8000
+      BACKEND_URL: http://inventory:8000
+    networks: [publica, privada]
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+      inventory:
+        condition: service_healthy
+    healthcheck: *healthcheck-python
