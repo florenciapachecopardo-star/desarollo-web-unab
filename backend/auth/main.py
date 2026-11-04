@@ -5,10 +5,13 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 
+from observabilidad import instalar
+
 app = FastAPI(
     title="Auth Service",
     description="Servicio simple de autenticacion"
 )
+instalar(app, "auth", confiar_identidad=False)
 
 USERS = {
     "ana": {"user_id": "USR-001", "password": "1234", "roles": ["user"]},

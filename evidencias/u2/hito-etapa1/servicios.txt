@@ -1,0 +1,7 @@
+NAME                      IMAGE                      COMMAND                  SERVICE      CREATED         STATUS                     PORTS
+chocomania-auth-1         chocomania-auth:dev        "uvicorn main:app --…"   auth         7 minutes ago   Up 7 minutes (healthy)     8000/tcp
+chocomania-gateway-1      chocomania-gateway:dev     "uvicorn gateway:app…"   gateway      7 minutes ago   Up 7 minutes (healthy)     0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+chocomania-inventory-1    chocomania-inventory:dev   "uvicorn main:app --…"   inventory    7 minutes ago   Up 7 minutes (healthy)     8000/tcp
+chocomania-mongo-1        mongo:7.0.14               "docker-entrypoint.s…"   mongo        5 hours ago     Up 5 hours (healthy)       27017/tcp
+chocomania-vault-1        hashicorp/vault:1.17.6     "docker-entrypoint.s…"   vault        5 hours ago     Up 5 hours (healthy)       8200/tcp
+chocomania-vault-init-1   hashicorp/vault:1.17.6     "sh /vault-init.sh"      vault-init   5 hours ago     Exited (0) 7 minutes ago   

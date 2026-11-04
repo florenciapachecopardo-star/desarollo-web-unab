@@ -1,83 +1,108 @@
 import os
 import secrets
-from fastapi import FastAPI, HTTPException, Header, Depends
+from typing import Optional
+
 from bson import ObjectId
+from bson.errors import InvalidId
+from fastapi import Depends, FastAPI, Header, Query, Request
 
 from database import productos_collection
-from models import ProductoModel, ProductoUpdateModel
+from models import Categoria, ProductoModel, ProductoUpdateModel
+from observabilidad import ApiError, instalar
 
-app = FastAPI(title="Chocomanía API - FastAPI & MongoDB")
+SERVICE = "inventory"
+POR_PAGINA = 20
 
 INTERNAL_GATEWAY_SECRET = os.getenv("INTERNAL_GATEWAY_SECRET")
 if not INTERNAL_GATEWAY_SECRET:
     raise RuntimeError("INTERNAL_GATEWAY_SECRET no esta configurado")
 
+app = FastAPI(title="Chocomania inventory")
+instalar(app, SERVICE, confiar_identidad=True)
+
 
 def verify_gateway(x_gateway_secret: str = Header(default="")):
-    valid = secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET)
-    if not valid:
-        raise HTTPException(status_code=403, detail="Solicitud no autorizada desde Gateway")
+    if not secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
 
 
 def verify_admin(x_authenticated_roles: str = Header(default="")):
-    roles = x_authenticated_roles.split(",")
-    if "admin" not in roles:
-        raise HTTPException(status_code=403, detail="Se requiere rol admin")
+    if "ADMIN" not in x_authenticated_roles.split(","):
+        raise ApiError(403, "FORBIDDEN", "Se requiere rol ADMIN")
+
+
+def parse_id(id: str) -> ObjectId:
+    try:
+        return ObjectId(id)
+    except (InvalidId, TypeError):
+        raise ApiError(400, "INVALID_ID", "El identificador tiene un formato invalido")
 
 
 def producto_helper(producto) -> dict:
+    stock = int(producto.get("stock", 0))
     return {
         "id": str(producto["_id"]),
-        "nombre": producto["nombre"],
-        "descripcion": producto["descripcion"],
-        "precio": producto["precio"],
-        "disponible": producto["disponible"]
+        "nombre": producto.get("nombre"),
+        "descripcion": producto.get("descripcion", ""),
+        "categoria": producto.get("categoria"),
+        "precio": producto.get("precio"),
+        "stock": stock,
+        "disponible": stock > 0,
+        "imagen": producto.get("imagen"),
     }
+
+
+def no_encontrado():
+    return ApiError(404, "PRODUCT_NOT_FOUND", "Producto no encontrado")
 
 
 @app.get("/health")
 def health():
-    return {"status": "OK"}
+    return {"status": "OK", "service": SERVICE}
 
 
 @app.get("/productos", dependencies=[Depends(verify_gateway)])
-async def consultar_productos():
-    productos = []
-    async for producto in productos_collection.find():
-        productos.append(producto_helper(producto))
-    return productos
+async def consultar_productos(
+    categoria: Optional[Categoria] = None,
+    pagina: int = Query(default=1, ge=1),
+):
+    filtro = {"categoria": categoria.value} if categoria else {}
+    total = await productos_collection.count_documents(filtro)
+    cursor = productos_collection.find(filtro).sort("nombre", 1).skip((pagina - 1) * POR_PAGINA).limit(POR_PAGINA)
+    productos = [producto_helper(p) async for p in cursor]
+    return {"productos": productos, "pagina": pagina, "total": total}
 
 
 @app.get("/productos/{id}", dependencies=[Depends(verify_gateway)])
 async def consultar_producto_por_id(id: str):
-    producto = await productos_collection.find_one({"_id": ObjectId(id)})
+    producto = await productos_collection.find_one({"_id": parse_id(id)})
     if producto is None:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        raise no_encontrado()
     return producto_helper(producto)
 
 
-@app.post("/productos", status_code=201, dependencies=[Depends(verify_gateway)])
+@app.post("/productos", status_code=201, dependencies=[Depends(verify_gateway), Depends(verify_admin)])
 async def insertar_producto(producto: ProductoModel):
-    nuevo_producto = await productos_collection.insert_one(producto.dict())
-    creado = await productos_collection.find_one({"_id": nuevo_producto.inserted_id})
+    nuevo = await productos_collection.insert_one(producto.model_dump(mode="json"))
+    creado = await productos_collection.find_one({"_id": nuevo.inserted_id})
     return producto_helper(creado)
 
 
-@app.put("/productos/{id}", dependencies=[Depends(verify_gateway)])
+@app.put("/productos/{id}", dependencies=[Depends(verify_gateway), Depends(verify_admin)])
 async def actualizar_producto(id: str, producto: ProductoUpdateModel):
-    datos = {k: v for k, v in producto.dict().items() if v is not None}
-    if len(datos) == 0:
-        raise HTTPException(status_code=400, detail="No se enviaron datos para actualizar")
-    resultado = await productos_collection.update_one({"_id": ObjectId(id)}, {"$set": datos})
+    oid = parse_id(id)
+    datos = producto.model_dump(mode="json", exclude_none=True)
+    if not datos:
+        raise ApiError(400, "BAD_REQUEST", "No se enviaron datos para actualizar")
+    resultado = await productos_collection.update_one({"_id": oid}, {"$set": datos})
     if resultado.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    actualizado = await productos_collection.find_one({"_id": ObjectId(id)})
-    return producto_helper(actualizado)
+        raise no_encontrado()
+    return producto_helper(await productos_collection.find_one({"_id": oid}))
 
 
 @app.delete("/productos/{id}", dependencies=[Depends(verify_gateway), Depends(verify_admin)])
 async def eliminar_producto(id: str):
-    resultado = await productos_collection.delete_one({"_id": ObjectId(id)})
+    resultado = await productos_collection.delete_one({"_id": parse_id(id)})
     if resultado.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        raise no_encontrado()
     return {"mensaje": "Producto eliminado correctamente"}

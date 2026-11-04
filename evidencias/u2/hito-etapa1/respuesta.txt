@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+date: Wed, 04 Nov 2026 22:41:26 GMT
+server: uvicorn
+content-type: application/json
+content-length: 192
+x-request-id: hito-etapa1-0002
+
+{"productos":[{"id":"6aebb2f43bb9a2ed5bff790f","nombre":"Chocolate Dubai","descripcion":"","categoria":"barras","precio":8990,"stock":10,"disponible":true,"imagen":null}],"pagina":1,"total":1}
