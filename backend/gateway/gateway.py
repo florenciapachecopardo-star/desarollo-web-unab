@@ -128,6 +128,7 @@ async def obtener_identidad(request: Request) -> dict:
     identidad = {
         "user_id": str(data["user_id"]),
         "roles": [r.upper() for r in data.get("roles", [])],
+        "nombre": data.get("nombre", ""),  # solo para /me; no se reenvia a los servicios
     }
     request.state.user_id = identidad["user_id"]
     return identidad
@@ -210,6 +211,8 @@ async def login(request: Request):
         raise ApiError(400, "BAD_REQUEST", "El cuerpo debe ser JSON")
 
     resp = await llamar_auth(request, "/login", body, con_secreto=False)
+    if resp.status_code == 422:
+        raise ApiError(422, "VALIDATION_ERROR", "Debes enviar correo y clave")
     if resp.status_code != 200:
         raise ApiError(401, "INVALID_CREDENTIALS", "Correo o clave incorrectos")
 
