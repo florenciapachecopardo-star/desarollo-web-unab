@@ -93,7 +93,7 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${GATEWAY_VAULT_TOKEN}
       AUTH_URL: http://auth:8000
-      BACKEND_URL: http://inventory:8000
+      INVENTORY_URL: http://inventory:8000
     networks: [publica, privada]
     depends_on:
       vault-init:
