@@ -1,144 +1,244 @@
 import os
+import re
+import time
+from dataclasses import dataclass
+from urllib.parse import quote
+
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response, Cookie
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
 
-app = FastAPI(
-    title="Gateway Seguro de Chocomanía",
-    description="API Gateway con Auth Service, Vault y sesiones"
-)
+from observabilidad import REQUEST_ID_HEADER, ApiError, instalar, log, request_id_de
 
-VAULT_ADDR = os.getenv("VAULT_ADDR", "http://127.0.0.1:8200")
+SERVICE = "gateway"
+
+VAULT_ADDR = os.getenv("VAULT_ADDR", "http://vault:8200")
 VAULT_TOKEN = os.getenv("VAULT_TOKEN")
-AUTH_URL = os.getenv("AUTH_URL", "http://127.0.0.1:8100")
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+AUTH_URL = os.getenv("AUTH_URL", "http://auth:8000")
+INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
+UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
+VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 
 if not VAULT_TOKEN:
     raise RuntimeError("VAULT_TOKEN no configurado")
 
-
-async def get_gateway_secrets():
-    url = f"{VAULT_ADDR}/v1/secret/data/gateway"
-    headers = {"X-Vault-Token": VAULT_TOKEN}
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.get(url, headers=headers)
-    if response.status_code != 200:
-        raise HTTPException(status_code=500, detail="No fue posible acceder a Vault")
-    vault_response = response.json()
-    return vault_response["data"]["data"]
+app = FastAPI(title="API Gateway de Chocomania")
+instalar(app, SERVICE, confiar_identidad=False)
 
 
-async def get_identity(session_token: str | None):
-    if session_token is None:
-        raise HTTPException(status_code=401, detail="No existe sesion valida")
+# ---------------------------------------------------------------------------
+# Lista blanca de rutas (M6). Lo que no esta aqui responde 404 o 405.
+# ---------------------------------------------------------------------------
 
-    secrets_data = await get_gateway_secrets()
-    introspection_secret = secrets_data["auth_introspection_secret"]
-
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.post(
-            f"{AUTH_URL}/introspect",
-            json={"token": session_token},
-            headers={"X-Gateway-Secret": introspection_secret}
-        )
-
-    if response.status_code != 200:
-        raise HTTPException(status_code=401, detail="No existe sesion valida")
-
-    data = response.json()
-    if not data.get("active"):
-        raise HTTPException(status_code=401, detail="Token invalido o expirado")
-
-    return data
+@dataclass(frozen=True)
+class RouteDefinition:
+    id: str              # ID del servicio en el M1
+    method: str
+    path: str            # ruta externa
+    acceso: str          # "anonimo" | "autenticado" | "rol"
+    roles: tuple         # roles permitidos si acceso == "rol"
+    destino: str         # clave en SERVICIOS
+    ruta_interna: str    # ruta en el servicio destino
 
 
-@app.get("/health")
-def health():
-    return {"status": "OK", "service": "Gateway Seguro de Chocomanía"}
+@dataclass(frozen=True)
+class ServiceTarget:
+    url: str
+    secreto: str         # nombre de la clave en Vault (secret/gateway)
 
 
-@app.post("/auth/login")
-async def login(request: Request):
-    body = await request.json()
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.post(f"{AUTH_URL}/login", json=body)
+SERVICIOS = {
+    "inventory": ServiceTarget(INVENTORY_URL, "backend_shared_secret"),
+}
 
-    if response.status_code != 200:
-        raise HTTPException(status_code=401, detail="Credenciales invalidas")
+RUTAS = [
+    RouteDefinition("S01", "GET", "/api/v1/productos", "anonimo", (), "inventory", "/productos"),
+    RouteDefinition("S02", "GET", "/api/v1/productos/{id}", "anonimo", (), "inventory", "/productos/{id}"),
+    RouteDefinition("S03", "POST", "/api/v1/productos", "rol", ("ADMIN",), "inventory", "/productos"),
+    RouteDefinition("S04", "PUT", "/api/v1/productos/{id}", "rol", ("ADMIN",), "inventory", "/productos/{id}"),
+    RouteDefinition("S05", "DELETE", "/api/v1/productos/{id}", "rol", ("ADMIN",), "inventory", "/productos/{id}"),
+]
 
-    data = response.json()
-    token = data["access_token"]
-
-    json_response = JSONResponse(content={"status": "OK"})
-    json_response.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        samesite="lax"
-    )
-    return json_response
+_PARAM_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
-@app.get("/auth/me")
-async def me(session_token: str | None = Cookie(default=None)):
-    identity = await get_identity(session_token)
-    return identity
+# ---------------------------------------------------------------------------
+# Secretos desde Vault, con cache corto (si Vault cae, se sigue hasta que expire)
+# ---------------------------------------------------------------------------
+
+_cache_secretos = {"datos": None, "expira": 0.0}
 
 
-@app.post("/auth/logout")
-async def logout(session_token: str | None = Cookie(default=None)):
-    if session_token:
-        secrets_data = await get_gateway_secrets()
-        introspection_secret = secrets_data["auth_introspection_secret"]
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
-                f"{AUTH_URL}/logout",
-                json={"token": session_token},
-                headers={"X-Gateway-Secret": introspection_secret}
-            )
-
-    json_response = JSONResponse(content={"status": "OK"})
-    json_response.delete_cookie("session_token")
-    return json_response
-
-
-@app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy(path: str, request: Request, session_token: str | None = Cookie(default=None)):
-    identity = await get_identity(session_token)
-
-    if request.method == "DELETE" and "admin" not in identity["roles"]:
-        raise HTTPException(status_code=403, detail="Se requiere rol admin")
-
-    secrets_data = await get_gateway_secrets()
-    backend_secret = secrets_data["backend_shared_secret"]
-
-    target_url = f"{BACKEND_URL}/{path}"
-    body = await request.body()
-
-    gateway_headers = {
-        "X-Gateway-Secret": backend_secret,
-        "X-Authenticated-User": identity["user_id"],
-        "X-Authenticated-Username": identity["username"],
-        "X-Authenticated-Roles": ",".join(identity["roles"])
-    }
-    content_type = request.headers.get("content-type")
-    if content_type:
-        gateway_headers["content-type"] = content_type
+async def secretos(request: Request) -> dict:
+    if _cache_secretos["datos"] and time.monotonic() < _cache_secretos["expira"]:
+        return _cache_secretos["datos"]
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            upstream = await client.request(
-                method=request.method,
-                url=target_url,
-                params=request.query_params,
-                content=body,
-                headers=gateway_headers
+        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
+            resp = await client.get(
+                f"{VAULT_ADDR}/v1/secret/data/gateway",
+                headers={"X-Vault-Token": VAULT_TOKEN, REQUEST_ID_HEADER: request_id_de(request)},
             )
     except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="Backend no disponible")
+        log(SERVICE, level="error", event="vault_unavailable", request_id=request_id_de(request))
+        raise ApiError(503, "SECRETS_UNAVAILABLE", "Servicio no disponible por el momento")
+
+    if resp.status_code != 200:
+        log(SERVICE, level="error", event="vault_error", request_id=request_id_de(request),
+            vault_status=resp.status_code)
+        raise ApiError(503, "SECRETS_UNAVAILABLE", "Servicio no disponible por el momento")
+
+    datos = resp.json()["data"]["data"]
+    _cache_secretos["datos"] = datos
+    _cache_secretos["expira"] = time.monotonic() + VAULT_CACHE_SECONDS
+    # Solo los nombres, nunca los valores
+    log(SERVICE, level="info", event="secret_loaded", request_id=request_id_de(request),
+        vault_path="secret/gateway", keys=sorted(datos))
+    return datos
+
+
+# ---------------------------------------------------------------------------
+# Identidad
+# ---------------------------------------------------------------------------
+
+async def llamar_auth(request: Request, ruta: str, body: dict, con_secreto: bool) -> httpx.Response:
+    headers = {REQUEST_ID_HEADER: request_id_de(request)}
+    if con_secreto:
+        headers["X-Gateway-Secret"] = (await secretos(request))["auth_introspection_secret"]
+    try:
+        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
+            return await client.post(f"{AUTH_URL}{ruta}", json=body, headers=headers)
+    except httpx.TimeoutException:
+        raise ApiError(504, "UPSTREAM_TIMEOUT", "El servicio de autenticacion no respondio a tiempo")
+    except httpx.RequestError:
+        raise ApiError(502, "UPSTREAM_UNAVAILABLE", "El servicio de autenticacion no esta disponible")
+
+
+async def obtener_identidad(request: Request) -> dict:
+    token = request.cookies.get("session_token")
+    if not token:
+        raise ApiError(401, "UNAUTHENTICATED", "Inicia sesion para continuar")
+
+    resp = await llamar_auth(request, "/introspect", {"token": token}, con_secreto=True)
+    data = resp.json() if resp.status_code == 200 else {}
+    if not data.get("active"):
+        raise ApiError(401, "SESSION_INVALID", "Tu sesion expiro o no es valida")
+
+    identidad = {
+        "user_id": str(data["user_id"]),
+        "roles": [r.upper() for r in data.get("roles", [])],
+        "nombre": data.get("nombre", ""),  # solo para /me; no se reenvia a los servicios
+    }
+    request.state.user_id = identidad["user_id"]
+    return identidad
+
+
+# ---------------------------------------------------------------------------
+# Reenvio a servicios internos
+# ---------------------------------------------------------------------------
+
+async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | None) -> Response:
+    destino = SERVICIOS[ruta.destino]
+
+    for valor in request.path_params.values():
+        if not _PARAM_VALIDO.match(valor):
+            raise ApiError(400, "INVALID_ID", "El identificador tiene un formato invalido")
+    ruta_interna = ruta.ruta_interna.format(**{k: quote(v, safe="") for k, v in request.path_params.items()})
+
+    # Solo se reenvian los headers que el gateway decide. Los X-Authenticated-*
+    # que mande el navegador se descartan.
+    headers = {
+        "X-Gateway-Secret": (await secretos(request))[destino.secreto],
+        REQUEST_ID_HEADER: request_id_de(request),
+    }
+    if identidad:
+        headers["X-Authenticated-User"] = identidad["user_id"]
+        headers["X-Authenticated-Roles"] = ",".join(identidad["roles"])
+    if request.headers.get("content-type"):
+        headers["content-type"] = request.headers["content-type"]
+
+    try:
+        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
+            upstream = await client.request(
+                ruta.method,
+                f"{destino.url}{ruta_interna}",
+                params=request.query_params,
+                content=await request.body(),
+                headers=headers,
+            )
+    except httpx.TimeoutException:
+        raise ApiError(504, "UPSTREAM_TIMEOUT", f"El servicio {ruta.destino} no respondio a tiempo")
+    except httpx.RequestError:
+        raise ApiError(502, "UPSTREAM_UNAVAILABLE", f"El servicio {ruta.destino} no esta disponible")
 
     response_headers = {}
     if "content-type" in upstream.headers:
         response_headers["content-type"] = upstream.headers["content-type"]
-
     return Response(content=upstream.content, status_code=upstream.status_code, headers=response_headers)
+
+
+def registrar(ruta: RouteDefinition):
+    async def handler(request: Request):
+        identidad = None
+        if ruta.acceso != "anonimo":
+            identidad = await obtener_identidad(request)
+            if ruta.acceso == "rol" and not set(ruta.roles) & set(identidad["roles"]):
+                raise ApiError(403, "FORBIDDEN", "No tienes permiso para esta operacion")
+        return await reenviar(request, ruta, identidad)
+
+    app.add_api_route(ruta.path, handler, methods=[ruta.method], name=ruta.id)
+
+
+for _ruta in RUTAS:
+    registrar(_ruta)
+
+
+# ---------------------------------------------------------------------------
+# Rutas propias del gateway (S06, S07, S08)
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+def health():
+    return {"status": "OK", "service": SERVICE}
+
+
+@app.post("/api/v1/auth/login", name="S06")
+async def login(request: Request):
+    try:
+        body = await request.json()
+    except ValueError:
+        raise ApiError(400, "BAD_REQUEST", "El cuerpo debe ser JSON")
+
+    resp = await llamar_auth(request, "/login", body, con_secreto=False)
+    if resp.status_code == 422:
+        raise ApiError(422, "VALIDATION_ERROR", "Debes enviar correo y clave")
+    if resp.status_code != 200:
+        raise ApiError(401, "INVALID_CREDENTIALS", "Correo o clave incorrectos")
+
+    data = resp.json()
+    respuesta = JSONResponse(content={"status": "OK"})
+    respuesta.set_cookie(
+        key="session_token",
+        value=data["access_token"],
+        max_age=int(data.get("expires_in", 900)),
+        httponly=True,
+        samesite="lax",
+        secure=COOKIE_SECURE,
+    )
+    return respuesta
+
+
+@app.get("/api/v1/auth/me", name="S08")
+async def me(request: Request):
+    return await obtener_identidad(request)
+
+
+@app.post("/api/v1/auth/logout", name="S07")
+async def logout(request: Request):
+    token = request.cookies.get("session_token")
+    if token:
+        await llamar_auth(request, "/logout", {"token": token}, con_secreto=True)
+    respuesta = JSONResponse(content={"status": "OK"})
+    respuesta.delete_cookie("session_token")
+    return respuesta

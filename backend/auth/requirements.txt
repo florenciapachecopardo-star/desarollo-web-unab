@@ -1,3 +1,7 @@
-fastapi
-uvicorn
-pydantic
+fastapi==0.115.4
+starlette==0.41.3
+uvicorn==0.32.0
+pydantic==2.9.2
+motor==3.6.0
+pymongo==4.9.2
+bcrypt==4.2.0
