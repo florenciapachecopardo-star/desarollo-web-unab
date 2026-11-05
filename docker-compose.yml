@@ -69,8 +69,29 @@ services:
     image: chocomania-auth:dev
     environment:
       AUTH_INTROSPECTION_SECRET: ${AUTH_INTROSPECTION_SECRET}
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      AUTH_TOKEN_TTL: ${AUTH_TOKEN_TTL:-900}
     networks: [privada]
+    depends_on:
+      mongo:
+        condition: service_healthy
     healthcheck: *healthcheck-python
+
+  # Datos de prueba. No arranca con "up": se usa con
+  #   docker compose run --rm seed            (cargar)
+  #   sh scripts/reset.sh                     (borrar y cargar)
+  seed:
+    image: chocomania-auth:dev
+    profiles: ["herramientas"]
+    entrypoint: ["python", "/scripts/seed.py"]
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+    networks: [privada]
+    depends_on:
+      mongo:
+        condition: service_healthy
 
   inventory:
     build: ./backend/inventory
