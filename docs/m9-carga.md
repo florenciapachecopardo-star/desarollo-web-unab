@@ -55,8 +55,8 @@ Cada usuario virtual hace `GET /api/v1/productos` a través del gateway y espera
 
 **Cómo reproducirlo:**
 
-1. `scripts/reset.sh` y `scripts/seed.py`
-2. `docker compose up`
+1. `docker compose up -d` (levanta el stack)
+2. `scripts/reset.sh` (deja la base en el estado inicial y carga el seed; necesita el stack arriba)
 3. `k6 run tests/carga/catalogo.js`
 4. Guardar la salida en `evidencias/u2/k6-catalogo.txt`
 
