@@ -1,7 +1,8 @@
 # M1. Matriz de servicios y contratos
 
 **Caso:** 19, Sistema de Ventas Online, adaptado a Chocomanía (chocolatería)
-**Fuente de la lista de servicios:** reparto de roles v2, sección 5. Se confirma al mergear el PR B (gateway).
+**Fuente de la lista de servicios:** reparto de roles v2, sección 5.
+**Contratos confirmados con el código:** S01 a S05 (PR B, gateway e inventory) y S06 a S08 (PR C, auth). S09 a S19 se confirman con los PR D, E y F.
 
 ## 1. Identificadores
 
@@ -36,7 +37,7 @@
 | F01 | Consultar catálogo | Anónimo | R01, R07 |
 | F02 | Registrarse como cliente | Anónimo | R05, R06, R11 |
 | F03 | Iniciar y cerrar sesión | Todos los roles | R12 |
-| F04 | Comprar y pagar | CLIENTE | R01, R02, R04, R08 |
+| F04 | Comprar y pagar | CLIENTE | R01, R02, R04 |
 | F05 | Ver mis pedidos | CLIENTE | R01, R03 |
 | F06 | Anular un pedido | CLIENTE dueño, ADMIN | R03 |
 | F07 | Administrar productos | ADMIN | R07, R10 |
@@ -57,10 +58,10 @@
 | S08 | R12 | F03 | Todas: cargar el usuario actual | Saber quién es y qué rol tiene | `GET /api/v1/auth/me` | Autenticado | Consulta | auth |
 | S09 | R05, R06, R11 | F02 | Registro: botón "Crear cuenta" | Registrar un cliente | `POST /api/v1/clientes` | Anónimo | Transaccional | clients |
 | S10 | R05 | F04, F05 | Perfil y checkout: cargar datos | Ver el perfil propio | `GET /api/v1/clientes/me` | CLIENTE | Consulta | clients |
-| S11 | R01, R04 | F04 | Checkout: botón "Confirmar pedido" | Crear un pedido | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders |
+| S11 | R01, R04 | F04 | Checkout: botón "Confirmar pedido" | Crear un pedido, asociado a la caja del cajero virtual | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders |
 | S12 | R01 | F05 | Mis pedidos: abrir un pedido | Ver el detalle de un pedido propio | `GET /api/v1/pedidos/{id}` | CLIENTE dueño, ADMIN | Consulta | orders |
 | S13 | R03 | F06 | Mis pedidos: botón "Anular" | Anular un pedido con motivo | `POST /api/v1/pedidos/{id}/anular` | CLIENTE dueño, ADMIN | Transaccional | orders |
-| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=pagado` | DESPACHO, ADMIN | Consulta | orders |
+| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=PAGADO` | DESPACHO, ADMIN | Consulta | orders |
 | S15 | R13 | F08 | Panel: cambiar estado | Marcar en despacho o entregado | `PATCH /api/v1/pedidos/{id}/estado` | DESPACHO, ADMIN | Transaccional | orders |
 | S16 | R02, R04 | F04 | Pago: botón "Pagar" | Iniciar el pago de un pedido | `POST /api/v1/pagos` | CLIENTE | Transaccional | payments |
 | S17 | R02 | F04 | Sin pantalla (lo llama el proveedor) | Recibir el aviso de pago | `POST /api/v1/pagos/aviso` | Proveedor (secreto propio) | Integración | payments |
@@ -70,27 +71,30 @@
 ## 3. Reglas comunes a todos los contratos
 
 1. **Formato de error único:** `{ "error": { "code", "message", "request_id" } }`
-2. **Correlación:** toda respuesta trae el header `X-Request-ID`. El gateway lo genera o reutiliza el que manda el front.
-3. **Lo calcula el servidor, nunca el navegador:** precio de cada línea, total del pedido, monto del pago y estado de pago. Si el front manda esos campos, se ignoran.
-4. **Identidad:** el gateway descarta los headers `X-Authenticated-*` que vengan del navegador y los vuelve a poner con la sesión validada.
-5. **Recurso ajeno:** si un cliente pide un pedido que no es suyo, la respuesta es 404 sin datos (no se confirma que exista).
-6. Todos los datos de los ejemplos son ficticios.
+2. **Validación:** si faltan campos o tienen un tipo o valor inválido, la respuesta es **422** `VALIDATION_ERROR` e indica qué campos fallaron, nunca los valores recibidos.
+3. **Correlación:** toda respuesta trae el header `X-Request-ID`. El gateway lo genera o reutiliza el que manda el front, y lo propaga a los servicios internos.
+4. **Lo calcula el servidor, nunca el navegador:** precio de cada línea, total del pedido, monto del pago, estado de pago y disponibilidad del producto (se calcula a partir del stock). Si el front manda esos campos, se ignoran.
+5. **Identidad:** el gateway descarta los headers `X-Authenticated-*` que vengan del navegador y los vuelve a poner (`X-Authenticated-User`, `X-Authenticated-Roles`) con la sesión validada.
+6. **Recurso ajeno:** si un cliente pide un pedido que no es suyo, la respuesta es 404 sin datos (no se confirma que exista).
+7. **Estados en mayúsculas**, igual que en el M2: PENDIENTE_PAGO, PAGADO, EN_DESPACHO, ENTREGADO, ANULADO.
+8. Todos los datos de los ejemplos son ficticios y coinciden con `scripts/seed.py` y `frontend/js/datos.js`.
 
 ## 4. Detalle de cada contrato
 
 ### S01 `GET /api/v1/productos`
 
-- **Entrada:** query opcional `tipo` (chocolate, bombon, trufa) y `pagina`.
-- **Salida:** 200 con la lista de productos.
-- **Errores:** 400 si `tipo` no es válido.
+- **Entrada:** query opcional `categoria` (barras, bombones, trufas) y `pagina` (desde 1).
+- **Salida:** 200 con la lista de productos, la página y el total.
+- **Errores:** 422 si `categoria` no es una de las tres o `pagina` es menor que 1.
 
 ```json
 {
   "productos": [
-    { "id": "665f1a2b3c4d5e6f7a8b9c01", "nombre": "Bombones surtidos 12 unidades", "tipo": "bombon", "precio": 8990, "disponible": true },
-    { "id": "665f1a2b3c4d5e6f7a8b9c02", "nombre": "Trufas de cacao 70%", "tipo": "trufa", "precio": 6490, "disponible": false }
+    { "id": "650000000000000000000001", "nombre": "Chocolate Dubai", "descripcion": "Barra de chocolate con leche rellena de crema de pistacho", "categoria": "barras", "precio": 8990, "stock": 20, "disponible": true, "imagen": "img/chocolate-dubai.jpg" },
+    { "id": "650000000000000000000005", "nombre": "Trufas de chocolate", "descripcion": "Trufas artesanales con cobertura de chocolate", "categoria": "trufas", "precio": 5490, "stock": 0, "disponible": false, "imagen": "img/trufas-de-chocolate.jpg" }
   ],
-  "pagina": 1
+  "pagina": 1,
+  "total": 5
 }
 ```
 
@@ -98,85 +102,84 @@
 
 - **Entrada:** `id` en la ruta.
 - **Salida:** 200 con el producto.
-- **Errores:** 400 ID con formato inválido, 404 no existe.
+- **Errores:** 400 `INVALID_ID` si el ID tiene formato inválido, 404 `PRODUCT_NOT_FOUND` si no existe.
 
 ```json
-{ "id": "665f1a2b3c4d5e6f7a8b9c01", "nombre": "Bombones surtidos 12 unidades", "descripcion": "Caja de bombones rellenos", "tipo": "bombon", "precio": 8990, "stock": 25, "disponible": true }
+{ "id": "650000000000000000000003", "nombre": "Bombones rellenos", "descripcion": "Bombones de chocolate con centro de crema", "categoria": "bombones", "precio": 6990, "stock": 10, "disponible": true, "imagen": "img/bombones-rellenos.jpg" }
 ```
 
 ### S03 `POST /api/v1/productos`
 
-- **Entrada:** nombre, descripcion, tipo, precio (entero > 0), stock (entero ≥ 0).
+- **Entrada:** nombre, descripcion (opcional), categoria (barras, bombones o trufas), precio (entero > 0), stock (entero ≥ 0) e imagen (opcional). `disponible` no se recibe: se calcula del stock.
 - **Salida:** 201 con el producto creado.
-- **Errores:** 400 datos inválidos, 401 sin sesión, 403 no es ADMIN.
+- **Errores:** 401 sin sesión, 403 `FORBIDDEN` si no es ADMIN (lo revisan el gateway e inventory), 422 datos inválidos.
 
 ```json
-{ "nombre": "Tableta chocolate amargo", "descripcion": "Tableta de 100 g", "tipo": "chocolate", "precio": 3990, "stock": 40 }
+{ "nombre": "Trufas de café", "descripcion": "Trufas rellenas de ganache de café", "categoria": "trufas", "precio": 5990, "stock": 12, "imagen": null }
 ```
 
 ### S04 `PUT /api/v1/productos/{id}`
 
-- **Entrada:** los mismos campos de S03.
+- **Entrada:** uno o más campos de S03 (solo se cambian los que vienen).
 - **Salida:** 200 con el producto actualizado.
-- **Errores:** 400, 401, 403, 404.
+- **Errores:** 400 si no viene ningún campo o el ID es inválido, 401, 403, 404, 422.
 
 ```json
-{ "nombre": "Tableta chocolate amargo", "descripcion": "Tableta de 100 g", "tipo": "chocolate", "precio": 4290, "stock": 35 }
+{ "precio": 9490, "stock": 18 }
 ```
 
 ### S05 `DELETE /api/v1/productos/{id}`
 
 - **Entrada:** `id` en la ruta.
-- **Salida:** 204 sin cuerpo.
-- **Errores:** 401, 403 no es ADMIN (se revisa en el gateway y en el servicio), 404.
+- **Salida:** 200 con un mensaje de confirmación.
+- **Errores:** 400 ID inválido, 401, 403 si no es ADMIN, 404.
 
 ```json
-{ "error": { "code": "FORBIDDEN", "message": "Solo un administrador puede eliminar productos", "request_id": "b7e2c1d4-0a9f-4c3e-8f21-5d6a7b8c9e01" } }
+{ "mensaje": "Producto eliminado correctamente" }
 ```
 
 ### S06 `POST /api/v1/auth/login`
 
 - **Entrada:** correo y clave.
-- **Salida:** 200, deja la sesión en una cookie `httponly` y devuelve el usuario sin datos sensibles.
-- **Errores:** 400 faltan campos, 401 credenciales inválidas (mismo mensaje si el correo no existe), 429 demasiados intentos (Etapa 4).
+- **Salida:** 200 `{ "status": "OK" }` y la sesión queda en una cookie `httponly` (`session_token`) que expira según `AUTH_TOKEN_TTL`. El token no se devuelve en el cuerpo.
+- **Errores:** 400 si el cuerpo no es JSON, 422 si falta correo o clave, 401 `INVALID_CREDENTIALS` (mismo mensaje si el correo no existe o la clave está mal). El límite de intentos (429) queda para la Etapa 4.
 
 ```json
-{ "correo": "cliente1@chocomania.test", "clave": "clave-ficticia-1" }
+{ "correo": "cliente@correo.cl", "clave": "Cliente2026" }
 ```
 
 ```json
-{ "usuario": { "id": "u-0001", "rol": "CLIENTE" } }
+{ "status": "OK" }
 ```
 
 ### S07 `POST /api/v1/auth/logout`
 
 - **Entrada:** cookie de sesión.
-- **Salida:** 204, la sesión se invalida y se borra la cookie.
-- **Errores:** 401 sin sesión.
+- **Salida:** 200 `{ "status": "OK" }`. La sesión se borra en auth y se elimina la cookie. Si no había sesión, responde igual.
 
 ### S08 `GET /api/v1/auth/me`
 
 - **Entrada:** cookie de sesión.
 - **Salida:** 200 con el usuario actual.
-- **Errores:** 401 sin sesión o sesión expirada.
+- **Errores:** 401 `UNAUTHENTICATED` sin cookie, 401 `SESSION_INVALID` si la sesión expiró o no existe.
 
 ```json
-{ "id": "u-0001", "correo": "cliente1@chocomania.test", "rol": "CLIENTE" }
+{ "user_id": "USR-0001", "roles": ["CLIENTE"], "nombre": "Valentina Soto" }
 ```
 
 ### S09 `POST /api/v1/clientes`
 
 - **Entrada:** run, nombre, direccion, comuna, provincia, region, fecha_nacimiento, sexo, correo, telefono y clave (campos del Caso 19, RF5).
 - **Salida:** 201 con el cliente creado y `correo_verificado: false`.
-- **Errores:** 400 RUN con dígito verificador inválido o datos faltantes, 409 RUN o correo ya registrado.
-- **Nota:** la validación del correo es simulada (código mostrado en pantalla, sin envío real). Se declara como brecha.
+- **Errores:** 400 RUN con dígito verificador inválido, 409 RUN o correo ya registrado, 422 datos faltantes.
+- **Nota:** la validación del correo con una API de mensajería (R11) es una brecha declarada: el código se simula y se muestra en pantalla, sin envío real.
 
 ```json
-{ "run": "12.345.678-5", "nombre": "Valentina Soto Pérez", "direccion": "Av. Ficticia 123", "comuna": "Maipú", "provincia": "Santiago", "region": "Metropolitana", "fecha_nacimiento": "1999-04-12", "sexo": "F", "correo": "valentina.soto@chocomania.test", "telefono": "+56900000000", "clave": "clave-ficticia-2" }
+{ "run": "12.345.678-5", "nombre": "Valentina Soto", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "provincia": "Santiago", "region": "Región Metropolitana de Santiago", "fecha_nacimiento": "1999-04-12", "sexo": "F", "correo": "cliente@correo.cl", "telefono": "+56912345678", "clave": "Cliente2026" }
 ```
 
 ```json
-{ "id": "c-0001", "correo": "valentina.soto@chocomania.test", "correo_verificado": false }
+{ "id": "CLI-0001", "correo": "cliente@correo.cl", "correo_verificado": false }
 ```
 
 ### S10 `GET /api/v1/clientes/me`
@@ -186,21 +189,21 @@
 - **Errores:** 401, 403 si el rol no es CLIENTE.
 
 ```json
-{ "id": "c-0001", "run": "**.***.678-5", "nombre": "Valentina Soto Pérez", "correo": "valentina.soto@chocomania.test", "direccion": "Av. Ficticia 123", "comuna": "Maipú", "correo_verificado": true }
+{ "id": "CLI-0001", "run": "**.***.678-5", "nombre": "Valentina Soto", "correo": "cliente@correo.cl", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "correo_verificado": true }
 ```
 
 ### S11 `POST /api/v1/pedidos`
 
-- **Entrada:** header `Idempotency-Key`, lista de líneas (producto_id y cantidad) y dirección de despacho. Si viene precio o total, se ignora.
-- **Salida:** 201 con el pedido en estado PENDIENTE_PAGO. El precio lo toma orders desde inventory.
-- **Errores:** 400 líneas vacías o cantidad ≤ 0, 401, 409 stock insuficiente. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pedido sin crear otro.
+- **Entrada:** header `Idempotency-Key`, lista de líneas (producto_id y cantidad) y dirección de despacho. Si viene precio, total o cajero, se ignoran.
+- **Salida:** 201 con el pedido en estado PENDIENTE_PAGO. orders toma el precio desde inventory y **asigna el `cajero_id` del cajero virtual** (R04): así cada venta web queda asociada a una caja.
+- **Errores:** 401, 409 stock insuficiente, 422 líneas vacías o cantidad ≤ 0. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pedido sin crear otro.
 
 ```json
-{ "lineas": [ { "producto_id": "665f1a2b3c4d5e6f7a8b9c01", "cantidad": 2 } ], "direccion_despacho": "Av. Ficticia 123, Maipú" }
+{ "lineas": [ { "producto_id": "650000000000000000000001", "cantidad": 2 } ], "direccion_despacho": "Av. Providencia 1234, Providencia" }
 ```
 
 ```json
-{ "id": "PED-0001", "estado": "PENDIENTE_PAGO", "lineas": [ { "producto_id": "665f1a2b3c4d5e6f7a8b9c01", "nombre": "Bombones surtidos 12 unidades", "cantidad": 2, "precio_unitario": 8990, "subtotal": 17980 } ], "total": 17980 }
+{ "id": "PED-0001", "estado": "PENDIENTE_PAGO", "cajero_id": "USR-0005", "lineas": [ { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "cantidad": 2, "precio_unitario": 8990, "subtotal": 17980 } ], "total": 17980 }
 ```
 
 ### S12 `GET /api/v1/pedidos/{id}`
@@ -210,34 +213,34 @@
 - **Errores:** 401, 404 si no existe o es de otro cliente (sin datos).
 
 ```json
-{ "id": "PED-0001", "estado": "PAGADO", "fecha": "2026-11-05T15:20:00-03:00", "total": 17980, "boleta": { "numero": 1001 } }
+{ "id": "PED-0001", "estado": "PAGADO", "fecha": "2026-11-05T15:20:00-03:00", "cajero_id": "USR-0005", "total": 17980 }
 ```
 
 ### S13 `POST /api/v1/pedidos/{id}/anular`
 
 - **Entrada:** motivo (obligatorio, RF3).
 - **Salida:** 200 con el pedido en estado ANULADO. El stock se devuelve a inventory. El registro no se borra.
-- **Errores:** 400 sin motivo, 401, 404 ajeno o inexistente, 409 el pedido ya no está en PENDIENTE_PAGO.
+- **Errores:** 401, 404 ajeno o inexistente, 409 el pedido ya no está en PENDIENTE_PAGO, 422 sin motivo.
 
 ```json
 { "motivo": "Me equivoqué en la cantidad" }
 ```
 
-### S14 `GET /api/v1/pedidos?estado=pagado`
+### S14 `GET /api/v1/pedidos?estado=PAGADO`
 
-- **Entrada:** query `estado`.
+- **Entrada:** query `estado` (en mayúsculas).
 - **Salida:** 200 con los pedidos pagados, del más antiguo al más nuevo (RF13).
-- **Errores:** 401, 403 si el rol no es DESPACHO ni ADMIN.
+- **Errores:** 401, 403 si el rol no es DESPACHO ni ADMIN, 422 estado desconocido.
 
 ```json
-{ "pedidos": [ { "id": "PED-0001", "fecha_pago": "2026-11-05T15:22:00-03:00", "direccion_despacho": "Av. Ficticia 123, Maipú", "lineas": [ { "nombre": "Bombones surtidos 12 unidades", "cantidad": 2 } ] } ] }
+{ "pedidos": [ { "id": "PED-0001", "fecha_pago": "2026-11-05T15:22:00-03:00", "direccion_despacho": "Av. Providencia 1234, Providencia", "lineas": [ { "nombre": "Chocolate Dubai", "cantidad": 2 } ] } ] }
 ```
 
 ### S15 `PATCH /api/v1/pedidos/{id}/estado`
 
 - **Entrada:** estado nuevo (EN_DESPACHO o ENTREGADO).
 - **Salida:** 200 con el pedido actualizado.
-- **Errores:** 400 estado desconocido, 401, 403, 404, 409 transición no permitida (por ejemplo, de PENDIENTE_PAGO a ENTREGADO).
+- **Errores:** 401, 403, 404, 409 transición no permitida (por ejemplo, de PENDIENTE_PAGO a ENTREGADO), 422 estado desconocido.
 
 ```json
 { "estado": "EN_DESPACHO" }
@@ -247,7 +250,7 @@
 
 - **Entrada:** header `Idempotency-Key` y pedido_id. El monto lo saca payments desde orders.
 - **Salida:** 201 con el pago en estado PENDIENTE.
-- **Errores:** 400, 401, 404 pedido ajeno o inexistente, 409 el pedido ya está pagado. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pago.
+- **Errores:** 401, 404 pedido ajeno o inexistente, 409 el pedido ya está pagado, 422. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pago.
 - **Nota:** el proveedor es un adaptador de prueba que respeta el contrato (no es Webpay).
 
 ```json
@@ -262,7 +265,7 @@
 
 - **Entrada:** header con el secreto propio del proveedor, pago_id, resultado y referencia del proveedor.
 - **Salida:** 200. Si el resultado es APROBADO, payments avisa a orders y el pedido pasa a PAGADO. Solo payments decide que un pedido está pagado.
-- **Errores:** 401 secreto inválido, 404 pago inexistente. Un aviso repetido no cambia nada.
+- **Errores:** 401 secreto inválido, 404 pago inexistente, 422. Un aviso repetido no cambia nada.
 
 ```json
 { "pago_id": "PAG-0001", "resultado": "APROBADO", "referencia_proveedor": "SIM-000123" }
@@ -279,24 +282,24 @@
 ```
 
 ```json
-{ "data": { "misPedidos": [ { "id": "PED-0001", "estado": "PAGADO", "total": 17980, "lineas": [ { "cantidad": 2, "producto": { "nombre": "Bombones surtidos 12 unidades" } } ] } ] } }
+{ "data": { "misPedidos": [ { "id": "PED-0001", "estado": "PAGADO", "total": 17980, "lineas": [ { "cantidad": 2, "producto": { "nombre": "Chocolate Dubai" } } ] } ] } }
 ```
 
 ### S19 `GET /api/v1/reportes/ventas`
 
 - **Entrada:** query `desde` y `hasta` (fechas).
 - **Salida:** 200 con el total vendido y el detalle por producto. Solo cuenta pedidos PAGADO, EN_DESPACHO o ENTREGADO.
-- **Errores:** 400 fechas inválidas o `desde` mayor que `hasta`, 401, 403.
+- **Errores:** 400 si `desde` es mayor que `hasta`, 401, 403, 422 fechas inválidas.
 
 ```json
-{ "desde": "2026-11-01", "hasta": "2026-11-30", "total_ventas": 17980, "cantidad_pedidos": 1, "por_producto": [ { "nombre": "Bombones surtidos 12 unidades", "cantidad": 2, "monto": 17980 } ] }
+{ "desde": "2026-11-01", "hasta": "2026-11-30", "total_ventas": 17980, "cantidad_pedidos": 1, "por_producto": [ { "nombre": "Chocolate Dubai", "cantidad": 2, "monto": 17980 } ] }
 ```
 
-## 5. Requisitos sin servicio propio (pendiente de decisión)
+## 5. Requisitos sin servicio propio
 
-| Requisito | Qué falta | Decisión |
+| Requisito | Decisión | Dónde se cubre o se declara |
 |---|---|---|
-| R04 | Venta por el cajero virtual. El rol CAJERO existe, pero no tiene ruta | Pendiente: agregar servicio o declarar brecha |
-| R08 | Emitir la boleta digital y enviarla por correo | Pendiente: agregar servicio o declarar brecha |
-| R06, R10 | Que el admin registre clientes, y mantenedores de usuarios y clientes | Pendiente: agregar servicio o declarar brecha |
-| R05, R11 | Validar el correo con una API de mensajería | Pendiente. Si queda simulado, se declara en el informe |
+| R04 | **Cubierto.** orders asigna un `cajero_id` (el cajero virtual) a cada pedido web | S11 |
+| R08 | **Brecha declarada.** No se emite boleta digital ni se envía por correo en la U2 | Informe, sección de brechas |
+| R11 (y la validación de correo de R05) | **Brecha declarada.** La validación con API de mensajería se simula, sin envío real | S09, M7 e informe |
+| R06, R10 | Pendiente: registro de clientes por el admin y mantenedores de usuarios y clientes | Por decidir con Flo |
