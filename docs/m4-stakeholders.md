@@ -10,7 +10,7 @@ La parte 2 (matriz de permisos por rol, servicio y ruta) va en `docs/m4-permisos
 | SH02 | Cliente | Persona externa | Comprar online, pagar, seguir y anular sus pedidos | CLIENTE | Sí, solo sobre sus propios datos y pedidos | Pantallas del cliente y boleta por correo |
 | SH03 | Administrador | Funcionario | Mantener productos, usuarios y clientes, y apoyar en ventas y anulaciones | ADMIN | Sí, el más amplio | Panel interno |
 | SH04 | Dueño | Funcionario | Saber cuánto se vende por período | DUENO | Solo consulta del reporte de ventas | Reporte de ventas (S19) |
-| SH05 | Cajero virtual | Funcionario | Asociar las ventas web a una caja y emitir la boleta (RF4, RF8) | CAJERO | Sí (servicio pendiente de decisión, ver sección 5 del M1) | Panel interno |
+| SH05 | Cajero virtual | Funcionario | Asociar las ventas web a una caja (RF4) | CAJERO | Sí: orders le asigna cada pedido web con `cajero_id` (S11). La boleta digital (RF8) es brecha declarada | Pedidos asignados en orders |
 | SH06 | Encargado de despacho | Funcionario | Ver los pedidos pagados en orden de llegada y marcar su avance | DESPACHO | Sí, solo sobre el estado de despacho | Cola de despacho (S14, S15) |
 | SH07 | Cocina | Funcionarios | Preparar los pedidos en el orden en que llegan | Ninguno | **No** | Orden de despacho impresa que le entrega DESPACHO (RF13) |
 | SH08 | Choferes | Funcionarios | Entregar los pedidos dentro del radio de 3 km | Ninguno | **No** | Orden de despacho impresa con dirección y teléfono |
