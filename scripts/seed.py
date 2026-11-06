@@ -59,6 +59,12 @@ def pedido(_id, cliente_id, estado, items, fecha, direccion):
     }
 
 
+def boleta_de(total, numero, fecha):
+    neto = round(total / 1.19)
+    return {"numero": numero, "fecha": fecha.isoformat(timespec="seconds"), "neto": neto,
+            "iva": total - neto, "total": total}
+
+
 PEDIDOS = [
     # PED-0001 de cliente1, pagado (aparece en la cola de despacho y en el reporte)
     pedido("PED-0001", "USR-0001", "PAGADO",
@@ -71,12 +77,26 @@ PEDIDOS = [
 ]
 
 
+# PED-0001 viene pagado: tiene su pago aprobado y su boleta
+_ped1 = PEDIDOS[0]
+_ped1["pago_id"] = "PAG-0001"
+_ped1["boleta"] = boleta_de(_ped1["total"], "B-000001", _ped1["creado_en"])
+
+PAGOS = [
+    {"_id": "PAG-0001", "pedido_id": "PED-0001", "cliente_id": "USR-0001", "monto": _ped1["total"],
+     "estado": "APROBADO", "proveedor": "simulado", "idempotency_key": "seed-PAG-0001",
+     "request_id": "seed", "creado_en": _ped1["creado_en"], "referencia_proveedor": "SIM-PAG-0001",
+     "boleta": _ped1["boleta"]},
+]
+
+
 def main():
     reset = "--reset" in sys.argv
     cliente = MongoClient(MONGO_URL, serverSelectionTimeoutMS=5000)
     auth_db = cliente["auth"]
     inventory_db = cliente["inventory"]
     orders_db = cliente["orders"]
+    payments_db = cliente["payments"]
 
     if reset:
         auth_db["usuarios"].delete_many({})
@@ -84,7 +104,9 @@ def main():
         inventory_db["productos"].delete_many({})
         orders_db["pedidos"].delete_many({})
         orders_db["contadores"].delete_many({})
-        print("reset: usuarios, sesiones, productos y pedidos borrados")
+        payments_db["pagos"].delete_many({})
+        payments_db["contadores"].delete_many({})
+        print("reset: usuarios, sesiones, productos, pedidos y pagos borrados")
 
     for _id, correo, clave, nombre, roles in USUARIOS:
         auth_db["usuarios"].replace_one(
@@ -121,6 +143,12 @@ def main():
     # El proximo pedido creado por la API sera PED-0003 (si el contador ya esta mas alto, no se baja)
     orders_db["contadores"].update_one({"_id": "pedido"}, {"$max": {"seq": len(PEDIDOS)}}, upsert=True)
     print(f"seed: {len(PEDIDOS)} pedidos (PED-0001 de cliente1 PAGADO, PED-0002 de cliente2 PENDIENTE_PAGO)")
+
+    for p in PAGOS:
+        payments_db["pagos"].replace_one({"_id": p["_id"]}, p, upsert=True)
+    orders_db["contadores"].update_one({"_id": "boleta"}, {"$max": {"seq": 1}}, upsert=True)
+    payments_db["contadores"].update_one({"_id": "pago"}, {"$max": {"seq": len(PAGOS)}}, upsert=True)
+    print(f"seed: {len(PAGOS)} pago (PAG-0001 aprobado, boleta B-000001 de PED-0001)")
 
 
 if __name__ == "__main__":
