@@ -8,10 +8,12 @@ set -eu
 : "${GATEWAY_VAULT_TOKEN:?Falta GATEWAY_VAULT_TOKEN}"
 : "${GATEWAY_INVENTORY_SECRET:?Falta GATEWAY_INVENTORY_SECRET}"
 : "${AUTH_INTROSPECTION_SECRET:?Falta AUTH_INTROSPECTION_SECRET}"
+: "${GATEWAY_ORDERS_SECRET:?Falta GATEWAY_ORDERS_SECRET}"
 
 vault kv put secret/gateway \
   backend_shared_secret="$GATEWAY_INVENTORY_SECRET" \
-  auth_introspection_secret="$AUTH_INTROSPECTION_SECRET" > /dev/null
+  auth_introspection_secret="$AUTH_INTROSPECTION_SECRET" \
+  orders_shared_secret="$GATEWAY_ORDERS_SECRET" > /dev/null
 echo "vault-init: secretos cargados en secret/gateway"
 
 echo 'path "secret/data/gateway" { capabilities = ["read"] }' | vault policy write gateway - > /dev/null
