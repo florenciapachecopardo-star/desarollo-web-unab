@@ -2,7 +2,8 @@
 
 **Caso:** 19, Sistema de Ventas Online, adaptado a Chocomanía (chocolatería)
 **Fuente de la lista de servicios:** reparto de roles v2, sección 5.
-**Contratos confirmados con el código:** S01 a S05 (PR B, gateway e inventory) y S06 a S08 (PR C, auth). S09 a S19 se confirman con los PR D, E y F.
+**Contratos confirmados con el código de `main` (3ba032e):** S01 a S08 y S11 a S19, comparados con `gateway.py`, `auth`, `inventory`, `orders`, `payments`, `graphql-gateway` y `frontend/js`. S09 y S10 no están implementados (recorte declarado, ver sección 5).
+**Datos de los ejemplos:** salen de `scripts/seed.py` y de las evidencias de `evidencias/u2/`.
 
 ## 1. Identificadores
 
@@ -46,38 +47,43 @@
 
 ## 2. Matriz de servicios
 
-| ID | R | F | Pantalla y acción | Propósito | Verbo y ruta | Acceso | Clasificación | Destino |
-|---|---|---|---|---|---|---|---|---|
-| S01 | R01, R07 | F01 | Catálogo: cargar la lista | Listar productos con su disponibilidad | `GET /api/v1/productos` | Anónimo | Consulta | inventory |
-| S02 | R01 | F01 | Catálogo: abrir un producto | Ver el detalle de un producto | `GET /api/v1/productos/{id}` | Anónimo | Consulta | inventory |
-| S03 | R07, R10 | F07 | Panel: crear producto | Agregar un producto al catálogo | `POST /api/v1/productos` | ADMIN | Transaccional | inventory |
-| S04 | R07, R10 | F07 | Panel: editar producto | Cambiar datos, precio o stock | `PUT /api/v1/productos/{id}` | ADMIN | Transaccional | inventory |
-| S05 | R10 | F07 | Panel: eliminar producto | Quitar un producto del catálogo | `DELETE /api/v1/productos/{id}` | ADMIN | Transaccional | inventory |
-| S06 | R12 | F03 | Login: botón "Ingresar" | Iniciar sesión | `POST /api/v1/auth/login` | Anónimo | Transaccional | auth |
-| S07 | R12 | F03 | Menú: "Cerrar sesión" | Cerrar sesión | `POST /api/v1/auth/logout` | Autenticado | Transaccional | auth |
-| S08 | R12 | F03 | Todas: cargar el usuario actual | Saber quién es y qué rol tiene | `GET /api/v1/auth/me` | Autenticado | Consulta | auth |
-| S09 | R05, R06, R11 | F02 | Registro: botón "Crear cuenta" | Registrar un cliente | `POST /api/v1/clientes` | Anónimo | Transaccional | clients |
-| S10 | R05 | F04, F05 | Perfil y checkout: cargar datos | Ver el perfil propio | `GET /api/v1/clientes/me` | CLIENTE | Consulta | clients |
-| S11 | R01, R04 | F04 | Checkout: botón "Confirmar pedido" | Crear un pedido, asociado a la caja del cajero virtual | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders |
-| S12 | R01 | F05 | Mis pedidos: abrir un pedido | Ver el detalle de un pedido propio | `GET /api/v1/pedidos/{id}` | CLIENTE dueño, ADMIN | Consulta | orders |
-| S13 | R03 | F06 | Mis pedidos: botón "Anular" | Anular un pedido con motivo | `POST /api/v1/pedidos/{id}/anular` | CLIENTE dueño, ADMIN | Transaccional | orders |
-| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=PAGADO` | DESPACHO, ADMIN | Consulta | orders |
-| S15 | R13 | F08 | Panel: cambiar estado | Marcar en despacho o entregado | `PATCH /api/v1/pedidos/{id}/estado` | DESPACHO, ADMIN | Transaccional | orders |
-| S16 | R02, R04 | F04 | Pago: botón "Pagar" | Iniciar el pago de un pedido | `POST /api/v1/pagos` | CLIENTE | Transaccional | payments |
-| S17 | R02 | F04 | Sin pantalla (lo llama el proveedor) | Recibir el aviso de pago | `POST /api/v1/pagos/aviso` | Proveedor (secreto propio) | Integración | payments |
-| S18 | R01 | F05 | Mis pedidos: cargar la lista | Pedidos propios con datos del producto | `POST /api/v1/graphql` (`misPedidos`) | Autenticado | Agregación | graphql-gateway |
-| S19 | R09 | F09 | Panel: reporte de ventas | Ventas por período | `GET /api/v1/reportes/ventas` | DUENO, ADMIN | Analítica | orders |
+| ID | R | F | Pantalla y acción | Propósito | Verbo y ruta | Acceso | Clasificación | Destino | Estado |
+|---|---|---|---|---|---|---|---|---|---|
+| S01 | R01, R07 | F01 | Catálogo: cargar la lista (también llena la ficha y el carrito) | Listar productos con su disponibilidad | `GET /api/v1/productos` | Anónimo | Consulta | inventory | Implementado y conectado |
+| S02 | R01 | F01 | Ficha del producto | Ver el detalle de un producto | `GET /api/v1/productos/{id}` | Anónimo | Consulta | inventory | Implementado; el front no lo llama, la ficha usa los datos de S01 |
+| S03 | R07, R10 | F07 | Panel: crear producto | Agregar un producto al catálogo | `POST /api/v1/productos` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
+| S04 | R07, R10 | F07 | Panel: editar producto | Cambiar datos, precio o stock | `PUT /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
+| S05 | R10 | F07 | Panel: eliminar producto | Quitar un producto del catálogo | `DELETE /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
+| S06 | R12 | F03 | Login: botón "Ingresar" | Iniciar sesión | `POST /api/v1/auth/login` | Anónimo | Transaccional | auth (vía gateway) | Implementado y conectado |
+| S07 | R12 | F03 | Menú: "Cerrar sesión" | Cerrar sesión | `POST /api/v1/auth/logout` | Autenticado | Transaccional | auth (vía gateway) | Implementado y conectado |
+| S08 | R12 | F03 | Todas: cargar el usuario actual | Saber quién es y qué rol tiene | `GET /api/v1/auth/me` | Autenticado | Consulta | auth (vía gateway) | Implementado y conectado |
+| S09 | R05, R06, R11 | F02 | Registro: botón "Crear cuenta" | Registrar un cliente | `POST /api/v1/clientes` | Anónimo | Transaccional | clients | **No implementado** (el registro sigue en localStorage) |
+| S10 | R05 | F04, F05 | Perfil y checkout: cargar datos | Ver el perfil propio | `GET /api/v1/clientes/me` | CLIENTE | Consulta | clients | **No implementado** |
+| S11 | R01, R04 | F04 | Checkout: botón "Continuar al pago" | Crear un pedido, asociado a la caja del cajero virtual | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders | Implementado y conectado |
+| S12 | R01, R08 | F04 | Pago y Boleta: cargar el pedido | Ver el detalle de un pedido | `GET /api/v1/pedidos/{id}` | CLIENTE dueño, DESPACHO (pedidos pagados), ADMIN | Consulta | orders | Implementado y conectado |
+| S13 | R03 | F06 | Mis pedidos: botón "Anular" | Anular un pedido con motivo | `POST /api/v1/pedidos/{id}/anular` | CLIENTE dueño, ADMIN | Transaccional | orders | Implementado y conectado |
+| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=PAGADO` | DESPACHO, ADMIN | Consulta | orders | Implementado; el panel del front sigue local |
+| S15 | R13 | F08 | Panel: cambiar estado | Marcar en despacho o entregado | `PATCH /api/v1/pedidos/{id}/estado` | DESPACHO, ADMIN | Transaccional | orders | Implementado; el panel del front sigue local |
+| S16 | R02, R08 | F04 | Pago: botón "Pagar" | Pagar un pedido propio y emitir la boleta | `POST /api/v1/pagos` | CLIENTE | Transaccional | payments | Implementado y conectado |
+| S17 | R02 | F04 | Sin pantalla (lo llama el proveedor) | Recibir el aviso de pago | `POST /api/v1/pagos/aviso` | Proveedor (secreto propio) | Integración | payments | Implementado (proveedor simulado) |
+| S18 | R01 | F05 | Mis pedidos: cargar la lista | Pedidos propios con datos actuales del producto | `POST /api/v1/graphql` (`misPedidos`, `pedido`) | Autenticado (las queries exigen CLIENTE) | Agregación | graphql-gateway | Implementado y conectado |
+| S19 | R09 | F09 | Panel: reporte de ventas | Ventas por período | `GET /api/v1/reportes/ventas` | DUENO, ADMIN | Analítica | orders | Implementado; el panel del front sigue local |
+
+**Acceso en dos capas:** el gateway revisa la sesión y el rol de la tabla (lista blanca en `gateway.py`). Para S12, S13 y S18 el gateway solo exige sesión, y la regla de propiedad la aplica orders (o graphql-gateway) con la identidad que le pasa el gateway.
 
 ## 3. Reglas comunes a todos los contratos
 
-1. **Formato de error único:** `{ "error": { "code", "message", "request_id" } }`
+1. **Formato de error único:** `{ "error": { "code", "message", "request_id" } }`. S18 es la excepción cuando el error es de un campo: responde 200 con `errors[]` y `extensions.code` (formato GraphQL).
 2. **Validación:** si faltan campos o tienen un tipo o valor inválido, la respuesta es **422** `VALIDATION_ERROR` e indica qué campos fallaron, nunca los valores recibidos.
-3. **Correlación:** toda respuesta trae el header `X-Request-ID`. El gateway lo genera o reutiliza el que manda el front, y lo propaga a los servicios internos.
-4. **Lo calcula el servidor, nunca el navegador:** precio de cada línea, total del pedido, monto del pago, estado de pago y disponibilidad del producto (se calcula a partir del stock). Si el front manda esos campos, se ignoran.
+3. **Correlación:** toda respuesta trae el header `X-Request-ID`. El gateway reutiliza el que manda el front si tiene entre 8 y 64 caracteres (letras, números, `-` o `_`); si no, genera uno. Lo propaga a todos los servicios internos.
+4. **Lo calcula el servidor, nunca el navegador:** precio de cada línea, total del pedido, `cajero_id`, estado del pedido, monto y estado del pago, número de boleta, neto e IVA, y disponibilidad del producto (se calcula a partir del stock). Si el front manda esos campos, se ignoran.
 5. **Identidad:** el gateway descarta los headers `X-Authenticated-*` que vengan del navegador y los vuelve a poner (`X-Authenticated-User`, `X-Authenticated-Roles`) con la sesión validada.
-6. **Recurso ajeno:** si un cliente pide un pedido que no es suyo, la respuesta es 404 sin datos (no se confirma que exista).
-7. **Estados en mayúsculas**, igual que en el M2: PENDIENTE_PAGO, PAGADO, EN_DESPACHO, ENTREGADO, ANULADO.
-8. Todos los datos de los ejemplos son ficticios y coinciden con `scripts/seed.py` y `frontend/js/datos.js`.
+6. **Recurso ajeno:** si un cliente pide un pedido que no es suyo, la respuesta es la misma que si no existiera: 404 `ORDER_NOT_FOUND` en S12, S13 y S16, y `null` en la query `pedido` de S18.
+7. **Idempotencia:** S11 y S16 exigen el header `Idempotency-Key` (8 a 64 caracteres: letras, números, `-` o `_`). Sin él, 400 `IDEMPOTENCY_KEY_REQUIRED`. Repetir la misma clave con el mismo contenido devuelve el mismo pedido o pago sin crear otro; repetirla con otro contenido da 409 `IDEMPOTENCY_CONFLICT`. La clave es por cliente.
+8. **Servicio caído o lento:** 502 `UPSTREAM_UNAVAILABLE` si el servicio no responde y 504 `UPSTREAM_TIMEOUT` si se pasa del plazo (con `docker-compose.yml`: 5 s desde el gateway y 3 s desde orders, payments y graphql-gateway). En S18 una caída de inventory no tumba la respuesta: ver S18.
+9. **Estados en mayúsculas**, igual que en el M2. Pedido: PENDIENTE_PAGO, PAGADO, EN_DESPACHO, ENTREGADO, ANULADO. Pago: PENDIENTE, APROBADO, RECHAZADO, REVERTIDO.
+10. **Fechas** en ISO 8601 con zona UTC (por ejemplo `2026-11-06T14:16:29+00:00`).
+11. Todos los datos de los ejemplos son ficticios y coinciden con `scripts/seed.py` y con las evidencias de `evidencias/u2/`.
 
 ## 4. Detalle de cada contrato
 
@@ -167,80 +173,106 @@
 { "user_id": "USR-0001", "roles": ["CLIENTE"], "nombre": "Valentina Soto" }
 ```
 
-### S09 `POST /api/v1/clientes`
+### S09 `POST /api/v1/clientes` (no implementado)
 
-- **Entrada:** run, nombre, direccion, comuna, provincia, region, fecha_nacimiento, sexo, correo, telefono y clave (campos del Caso 19, RF5).
-- **Salida:** 201 con el cliente creado y `correo_verificado: false`.
-- **Errores:** 400 RUN con dígito verificador inválido, 409 RUN o correo ya registrado, 422 datos faltantes.
-- **Nota:** la validación del correo con una API de mensajería (R11) es una brecha declarada: el código se simula y se muestra en pantalla, sin envío real.
+Contrato diseñado para el servicio clients, que no se construyó en esta entrega. El registro (`registro.html` y `verificar.html`) sigue guardando en localStorage del navegador. Queda como brecha declarada (sección 5).
+
+- **Entrada prevista:** run, nombre, direccion, comuna, provincia, region, fecha_nacimiento, sexo, correo, telefono y clave (campos del Caso 19, RF5).
+- **Salida prevista:** 201 con el cliente creado y `correo_verificado: false`.
+- **Errores previstos:** 400 RUN con dígito verificador inválido, 409 RUN o correo ya registrado, 422 datos faltantes.
 
 ```json
 { "run": "12.345.678-5", "nombre": "Valentina Soto", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "provincia": "Santiago", "region": "Región Metropolitana de Santiago", "fecha_nacimiento": "1999-04-12", "sexo": "F", "correo": "cliente@correo.cl", "telefono": "+56912345678", "clave": "Cliente2026" }
 ```
 
-```json
-{ "id": "CLI-0001", "correo": "cliente@correo.cl", "correo_verificado": false }
-```
+### S10 `GET /api/v1/clientes/me` (no implementado)
 
-### S10 `GET /api/v1/clientes/me`
+Contrato diseñado para clients, que no se construyó. El checkout pide la dirección de despacho en el mismo formulario (va dentro de S11).
 
-- **Entrada:** cookie de sesión.
-- **Salida:** 200 con el perfil propio (el RUN se muestra enmascarado).
-- **Errores:** 401, 403 si el rol no es CLIENTE.
-
-```json
-{ "id": "CLI-0001", "run": "**.***.678-5", "nombre": "Valentina Soto", "correo": "cliente@correo.cl", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "correo_verificado": true }
-```
+- **Salida prevista:** 200 con el perfil propio y el RUN enmascarado (`**.***.678-5`).
+- **Errores previstos:** 401, 403 si el rol no es CLIENTE.
 
 ### S11 `POST /api/v1/pedidos`
 
-- **Entrada:** header `Idempotency-Key`, lista de líneas (producto_id y cantidad) y dirección de despacho. Si viene precio, total o cajero, se ignoran.
-- **Salida:** 201 con el pedido en estado PENDIENTE_PAGO. orders toma el precio desde inventory y **asigna el `cajero_id` del cajero virtual** (R04): así cada venta web queda asociada a una caja.
-- **Errores:** 401, 409 stock insuficiente, 422 líneas vacías o cantidad ≤ 0. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pedido sin crear otro.
+- **Entrada:** header `Idempotency-Key` y cuerpo con `lineas` (1 a 20, cada una con `producto_id` y `cantidad` de 1 a 20, sin repetir producto) y `despacho` (`direccion` de 3 a 120 caracteres, `comuna` de 2 a 60 y `telefono` opcional de hasta 20). Si viene precio, total, estado o cajero, se ignoran.
+- **Salida:** 201 con el pedido en estado PENDIENTE_PAGO. orders reserva el stock en inventory (que devuelve el precio vigente), calcula subtotales y total, y **asigna el `cajero_id` del cajero virtual** USR-0005 (R04). Si se repite el mismo `Idempotency-Key` con el mismo cuerpo, devuelve el mismo pedido sin descontar stock otra vez.
+- **Errores:** 400 `IDEMPOTENCY_KEY_REQUIRED`, 400 `BAD_REQUEST` si un producto aparece dos veces, 400 `INVALID_ID` si un `producto_id` tiene formato inválido, 401, 403 `FORBIDDEN` si no es CLIENTE, 404 `PRODUCT_NOT_FOUND`, 409 `STOCK_INSUFICIENTE`, 409 `IDEMPOTENCY_CONFLICT`, 422, 502 o 504 si inventory no responde.
+- **Evidencia:** `evidencias/u2/pedido-idempotente/`.
 
 ```json
-{ "lineas": [ { "producto_id": "650000000000000000000001", "cantidad": 2 } ], "direccion_despacho": "Av. Providencia 1234, Providencia" }
+{ "lineas": [ { "producto_id": "650000000000000000000001", "cantidad": 2 } ], "despacho": { "direccion": "Calle Ficticia 1", "comuna": "Providencia", "telefono": null } }
 ```
 
 ```json
-{ "id": "PED-0001", "estado": "PENDIENTE_PAGO", "cajero_id": "USR-0005", "lineas": [ { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "cantidad": 2, "precio_unitario": 8990, "subtotal": 17980 } ], "total": 17980 }
+{
+  "id": "PED-0003", "cliente_id": "USR-0001", "estado": "PENDIENTE_PAGO", "cajero_id": "USR-0005",
+  "lineas": [ { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "precio_unitario": 8990, "cantidad": 2, "subtotal": 17980 } ],
+  "total": 17980,
+  "creado_en": "2026-11-06T14:16:29+00:00",
+  "historial": [ { "estado": "PENDIENTE_PAGO", "fecha": "2026-11-06T14:16:29+00:00", "por": "USR-0001" } ],
+  "despacho": { "direccion": "Calle Ficticia 1", "comuna": "Providencia", "telefono": null }
+}
 ```
 
 ### S12 `GET /api/v1/pedidos/{id}`
 
 - **Entrada:** `id` en la ruta.
-- **Salida:** 200 con el pedido.
-- **Errores:** 401, 404 si no existe o es de otro cliente (sin datos).
+- **Salida:** 200 con el pedido, en el mismo formato de S11. Si está pagado trae `boleta` (R08 parcial); si está anulado trae `motivo_anulacion`. El `despacho` solo lo ven el dueño, DESPACHO y ADMIN (M7). Lo usan `pago.html` y `boleta.html`.
+- **Errores:** 400 `INVALID_ID`, 401, 404 `ORDER_NOT_FOUND` si no existe o es de otro cliente (DESPACHO tampoco ve pedidos sin pagar).
 
 ```json
-{ "id": "PED-0001", "estado": "PAGADO", "fecha": "2026-11-05T15:20:00-03:00", "cajero_id": "USR-0005", "total": 17980 }
+{
+  "id": "PED-0003", "cliente_id": "USR-0001", "estado": "PAGADO", "cajero_id": "USR-0005",
+  "lineas": [ { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "precio_unitario": 8990, "cantidad": 2, "subtotal": 17980 } ],
+  "total": 17980,
+  "creado_en": "2026-11-06T14:16:29+00:00",
+  "historial": [
+    { "estado": "PENDIENTE_PAGO", "fecha": "2026-11-06T14:16:29+00:00", "por": "USR-0001" },
+    { "estado": "PAGADO", "fecha": "2026-11-06T14:16:31+00:00", "por": "payments" }
+  ],
+  "despacho": { "direccion": "Calle Ficticia 1", "comuna": "Providencia", "telefono": null },
+  "boleta": { "numero": "B-000002", "fecha": "2026-11-06T14:16:31+00:00", "neto": 15109, "iva": 2871, "total": 17980 }
+}
 ```
 
 ### S13 `POST /api/v1/pedidos/{id}/anular`
 
-- **Entrada:** motivo (obligatorio, RF3).
-- **Salida:** 200 con el pedido en estado ANULADO. El stock se devuelve a inventory. El registro no se borra.
-- **Errores:** 401, 404 ajeno o inexistente, 409 el pedido ya no está en PENDIENTE_PAGO, 422 sin motivo.
+- **Entrada:** `motivo` (obligatorio, de 3 a 200 caracteres, RF3).
+- **Salida:** 200 con el pedido en estado ANULADO y `motivo_anulacion`. El registro no se borra. El cambio de estado es atómico: si llegan dos anulaciones juntas, solo una devuelve el stock. Si inventory no responde al devolver, el pedido igual queda anulado, se guarda `stock_devuelto: false` y se registra el evento `stock_return_failed` en el log.
+- **Errores:** 400 `INVALID_ID`, 401, 404 `ORDER_NOT_FOUND` ajeno o inexistente, 409 `TRANSICION_INVALIDA` si el pedido ya no está en PENDIENTE_PAGO, 422 sin motivo o muy corto.
 
 ```json
-{ "motivo": "Me equivoqué en la cantidad" }
+{ "motivo": "me equivoque de producto" }
 ```
 
 ### S14 `GET /api/v1/pedidos?estado=PAGADO`
 
-- **Entrada:** query `estado` (en mayúsculas).
-- **Salida:** 200 con los pedidos pagados, del más antiguo al más nuevo (RF13).
-- **Errores:** 401, 403 si el rol no es DESPACHO ni ADMIN, 422 estado desconocido.
+- **Entrada:** query opcional `estado` (en mayúsculas), `pagina` (desde 1) y `por_pagina` (1 a 50, por defecto 20).
+- **Salida:** 200 con `{ pedidos, pagina, total }`, del más antiguo al más nuevo según `creado_en` (RF13). Sin `estado`, DESPACHO recibe PAGADO, EN_DESPACHO y ENTREGADO, y ADMIN recibe todos.
+- **Errores:** 401, 403 si el rol no es DESPACHO ni ADMIN (lo revisa el gateway) o si DESPACHO pide un estado sin pagar (PENDIENTE_PAGO o ANULADO), 422 estado desconocido.
 
 ```json
-{ "pedidos": [ { "id": "PED-0001", "fecha_pago": "2026-11-05T15:22:00-03:00", "direccion_despacho": "Av. Providencia 1234, Providencia", "lineas": [ { "nombre": "Chocolate Dubai", "cantidad": 2 } ] } ] }
+{
+  "pedidos": [
+    { "id": "PED-0001", "cliente_id": "USR-0001", "estado": "PAGADO", "cajero_id": "USR-0005",
+      "lineas": [ { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "precio_unitario": 8990, "cantidad": 1, "subtotal": 8990 },
+                  { "producto_id": "650000000000000000000003", "nombre": "Bombones rellenos", "precio_unitario": 6990, "cantidad": 2, "subtotal": 13980 } ],
+      "total": 22970, "creado_en": "2026-11-02T15:00:00+00:00",
+      "despacho": { "direccion": "Calle Ficticia 123", "comuna": "Providencia", "telefono": "+56900000000" },
+      "boleta": { "numero": "B-000001", "fecha": "2026-11-02T15:00:00+00:00", "neto": 19303, "iva": 3667, "total": 22970 } }
+  ],
+  "pagina": 1,
+  "total": 1
+}
 ```
+
+(Ejemplo resumido: cada pedido trae también su `historial`.)
 
 ### S15 `PATCH /api/v1/pedidos/{id}/estado`
 
-- **Entrada:** estado nuevo (EN_DESPACHO o ENTREGADO).
-- **Salida:** 200 con el pedido actualizado.
-- **Errores:** 401, 403, 404, 409 transición no permitida (por ejemplo, de PENDIENTE_PAGO a ENTREGADO), 422 estado desconocido.
+- **Entrada:** `estado` nuevo. Solo se permite PAGADO → EN_DESPACHO y EN_DESPACHO → ENTREGADO. PAGADO lo pone únicamente payments.
+- **Salida:** 200 con el pedido actualizado y una entrada nueva en `historial`.
+- **Errores:** 400 `INVALID_ID`, 401, 403, 404 `ORDER_NOT_FOUND`, 409 `TRANSICION_INVALIDA` (por ejemplo, de PENDIENTE_PAGO a ENTREGADO, o pedir PAGADO o ANULADO), 422 estado desconocido.
 
 ```json
 { "estado": "EN_DESPACHO" }
@@ -248,58 +280,116 @@
 
 ### S16 `POST /api/v1/pagos`
 
-- **Entrada:** header `Idempotency-Key` y pedido_id. El monto lo saca payments desde orders.
-- **Salida:** 201 con el pago en estado PENDIENTE.
-- **Errores:** 401, 404 pedido ajeno o inexistente, 409 el pedido ya está pagado, 422. Si se repite el mismo `Idempotency-Key`, devuelve el mismo pago.
-- **Nota:** el proveedor es un adaptador de prueba que respeta el contrato (no es Webpay).
+- **Entrada:** header `Idempotency-Key` y `pedido_id`. El monto lo saca payments desde orders; no se reciben datos de tarjeta (M7).
+- **Salida:** 201 con el pago. Con el proveedor simulado en modo `inmediato` (el de `docker-compose.yml`), el pago vuelve APROBADO y payments le avisa a orders, que pasa el pedido a PAGADO y numera la boleta. En modo `aviso`, el pago queda PENDIENTE hasta que llega S17. Si el pago está aprobado pero orders no alcanzó a registrarlo, viene `pedido_sincronizado: false` y payments reintenta cada 15 s.
+- **Errores:** 400 `IDEMPOTENCY_KEY_REQUIRED`, 401, 403 si no es CLIENTE, 404 `ORDER_NOT_FOUND` pedido ajeno o inexistente, 409 `PEDIDO_NO_PAGABLE` si el pedido no está en PENDIENTE_PAGO, 409 `IDEMPOTENCY_CONFLICT`, 422, 502 o 504 si orders no responde al consultar el pedido.
+- **Nota:** el proveedor es un doble de prueba que respeta el contrato (no es Webpay).
+- **Evidencia:** `evidencias/u2/pago-idempotente/` y `evidencias/u2/pago-orders-caido/`.
 
 ```json
-{ "pedido_id": "PED-0001" }
+{ "pedido_id": "PED-0003" }
 ```
 
 ```json
-{ "id": "PAG-0001", "pedido_id": "PED-0001", "monto": 17980, "estado": "PENDIENTE" }
+{
+  "id": "PAG-0002", "pedido_id": "PED-0003", "monto": 17980, "estado": "APROBADO", "proveedor": "simulado",
+  "creado_en": "2026-11-06T14:16:31+00:00",
+  "pedido_sincronizado": true,
+  "boleta": { "numero": "B-000002", "fecha": "2026-11-06T14:16:31+00:00", "neto": 15109, "iva": 2871, "total": 17980 }
+}
 ```
 
 ### S17 `POST /api/v1/pagos/aviso`
 
-- **Entrada:** header con el secreto propio del proveedor, pago_id, resultado y referencia del proveedor.
-- **Salida:** 200. Si el resultado es APROBADO, payments avisa a orders y el pedido pasa a PAGADO. Solo payments decide que un pedido está pagado.
-- **Errores:** 401 secreto inválido, 404 pago inexistente, 422. Un aviso repetido no cambia nada.
+- **Entrada:** header `X-Proveedor-Secret` (secreto propio del proveedor) y cuerpo con `pago_id`, `resultado` (APROBADO o RECHAZADO) y `referencia_proveedor`. El gateway la deja pasar sin sesión porque la llama el proveedor; payments revisa el secreto.
+- **Salida:** 200 con el pago. Si el resultado es APROBADO, payments avisa a orders y el pedido pasa a PAGADO con su boleta. Solo payments decide que un pedido está pagado. Un aviso repetido no cambia nada (si el pago estaba aprobado pero sin sincronizar, aprovecha de reintentar). Si el pedido ya estaba pagado con otro pago, este queda REVERTIDO.
+- **Errores:** 401 `INVALID_PROVIDER_SIGNATURE` secreto inválido, 404 `PAYMENT_NOT_FOUND`, 422.
 
 ```json
-{ "pago_id": "PAG-0001", "resultado": "APROBADO", "referencia_proveedor": "SIM-000123" }
+{ "pago_id": "PAG-0002", "resultado": "APROBADO", "referencia_proveedor": "SIM-PAG-0002" }
 ```
 
-### S18 `POST /api/v1/graphql` (`misPedidos`)
+### S18 `POST /api/v1/graphql`
 
-- **Entrada:** query `misPedidos` con paginación.
-- **Salida:** 200 con los pedidos del usuario y el nombre de cada producto. Junta datos de orders e inventory.
-- **Errores:** 401, error por superar el límite de profundidad. Si inventory no responde, la respuesta trae `errors` y marca los datos faltantes en vez de mostrarlos como completos.
+- **Entrada:** cuerpo `{ query, variables }`. Solo POST y sin GraphiQL. Dos queries, ambas solo para CLIENTE:
+  - `misPedidos(pagina, porPagina)`: pedidos propios del más antiguo al más nuevo (`porPagina` de 1 a 20, por defecto 10). Devuelve `{ items, pagina, porPagina, total }`.
+  - `pedido(id)`: un pedido propio; si es ajeno o no existe, `null`.
+- **Tipos:** Pedido (`id`, `estado`, `total`, `creadoEn`, `boleta`, `despacho`, `lineas`), Linea (`productoId`, `nombre`, `cantidad`, `precioUnitario`, `subtotal`, `producto`, `pedido`), Producto (`id`, `nombre`, `categoria`, `imagen`, `disponible`, `stock`), Boleta y Despacho (`direccion` y `comuna`, sin teléfono).
+- **Salida:** 200 con `data`. Junta orders (pedidos) e inventory (estado actual de cada producto) con una sola llamada a inventory por consulta (DataLoader).
+- **Límites:** profundidad 6, 10 alias y 1000 tokens. Si se pasan, la consulta se rechaza entera.
+- **Errores:** 401 sin sesión (HTTP, lo responde el gateway). Los demás van en `errors[]` con `extensions.code`: `FORBIDDEN` si el rol no es CLIENTE, `BAD_REQUEST` paginación fuera de rango, `FORBIDDEN_FIELD` si se pide `stock` sin ser ADMIN, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_TIMEOUT` o `UPSTREAM_ERROR` si un servicio falla. Si inventory no responde, los pedidos igual llegan y `producto` viene `null` con su error (error parcial).
+- **Evidencia:** `evidencias/u2/graphql-agregacion/` y `evidencias/u2/graphql-error-parcial/`.
 
 ```json
-{ "query": "query { misPedidos(pagina: 1) { id estado total lineas { cantidad producto { nombre } } } }" }
+{ "query": "query MisPedidos($pagina: Int!) { misPedidos(pagina: $pagina, porPagina: 10) { total items { id estado total boleta { numero } lineas { nombre cantidad producto { disponible imagen } } } } }", "variables": { "pagina": 1 } }
 ```
 
 ```json
-{ "data": { "misPedidos": [ { "id": "PED-0001", "estado": "PAGADO", "total": 17980, "lineas": [ { "cantidad": 2, "producto": { "nombre": "Chocolate Dubai" } } ] } ] } }
+{ "data": { "misPedidos": { "total": 2, "items": [
+  { "id": "PED-0001", "estado": "PAGADO", "total": 22970, "boleta": { "numero": "B-000001" },
+    "lineas": [ { "nombre": "Chocolate Dubai", "cantidad": 1, "producto": { "disponible": true, "imagen": "img/chocolate-dubai.jpg" } },
+                { "nombre": "Bombones rellenos", "cantidad": 2, "producto": { "disponible": true, "imagen": "img/bombones-rellenos.jpg" } } ] },
+  { "id": "PED-0003", "estado": "PENDIENTE_PAGO", "total": 15980, "boleta": null,
+    "lineas": [ { "nombre": "Chocolate Dubai", "cantidad": 1, "producto": { "disponible": true, "imagen": "img/chocolate-dubai.jpg" } },
+                { "nombre": "Bombones rellenos", "cantidad": 1, "producto": { "disponible": true, "imagen": "img/bombones-rellenos.jpg" } } ] }
+] } } }
+```
+
+Con inventory caído (error parcial, resumido):
+
+```json
+{ "data": { "misPedidos": { "items": [ { "id": "PED-0001", "estado": "PAGADO", "lineas": [ { "nombre": "Chocolate Dubai", "producto": null } ] } ] } },
+  "errors": [ { "message": "inventory no esta disponible", "path": ["misPedidos", "items", 0, "lineas", 0, "producto"], "extensions": { "code": "UPSTREAM_UNAVAILABLE" } } ] }
 ```
 
 ### S19 `GET /api/v1/reportes/ventas`
 
-- **Entrada:** query `desde` y `hasta` (fechas).
-- **Salida:** 200 con el total vendido y el detalle por producto. Solo cuenta pedidos PAGADO, EN_DESPACHO o ENTREGADO.
-- **Errores:** 400 si `desde` es mayor que `hasta`, 401, 403, 422 fechas inválidas.
+- **Entrada:** query opcional `desde` y `hasta` (fechas `AAAA-MM-DD`). Sin fechas, cuenta todo.
+- **Salida:** 200 con la cantidad de pedidos, el total vendido y el detalle por producto (de mayor a menor monto). Solo cuenta pedidos PAGADO, EN_DESPACHO o ENTREGADO, y los ubica en el día en que se pagaron (`pagado_en`), no en el que se crearon. No incluye datos personales de clientes.
+- **Errores:** 400 `BAD_REQUEST` si `desde` es mayor que `hasta`, 401, 403 si el rol no es DUENO ni ADMIN, 422 fechas inválidas.
 
 ```json
-{ "desde": "2026-11-01", "hasta": "2026-11-30", "total_ventas": 17980, "cantidad_pedidos": 1, "por_producto": [ { "nombre": "Chocolate Dubai", "cantidad": 2, "monto": 17980 } ] }
+{
+  "desde": "2026-11-01", "hasta": "2026-11-30",
+  "cantidad_pedidos": 1, "total_ventas": 22970,
+  "por_producto": [
+    { "producto_id": "650000000000000000000003", "nombre": "Bombones rellenos", "cantidad": 2, "monto": 13980 },
+    { "producto_id": "650000000000000000000001", "nombre": "Chocolate Dubai", "cantidad": 1, "monto": 8990 }
+  ]
+}
 ```
 
-## 5. Requisitos sin servicio propio
+(Datos de `scripts/seed.py` recién reseteado.)
 
-| Requisito | Decisión | Dónde se cubre o se declara |
+## 5. Estado de los requisitos
+
+| Requisito | Estado | Dónde se cubre o se declara |
 |---|---|---|
-| R04 | **Cubierto.** orders asigna un `cajero_id` (el cajero virtual) a cada pedido web | S11 |
-| R08 | **Brecha declarada.** No se emite boleta digital ni se envía por correo en la U2 | Informe, sección de brechas |
-| R11 (y la validación de correo de R05) | **Brecha declarada.** La validación con API de mensajería se simula, sin envío real | S09, M7 e informe |
-| R06, R10 | Pendiente: registro de clientes por el admin y mantenedores de usuarios y clientes | Por decidir con Flo |
+| R01 | **Cubierto** | S01, S11, S12, S18 |
+| R02 | **Cubierto.** El pedido pasa a PAGADO solo cuando payments lo confirma, y solo los pagados entran a la cola de despacho | S14, S16, S17 |
+| R03 | **Cubierto.** Anulación con motivo, sin borrar el registro y con devolución de stock | S13 |
+| R04 | **Cubierto.** orders asigna el `cajero_id` USR-0005 (cajero virtual) a cada pedido web | S11 |
+| R05 | **Brecha declarada.** El registro existe en el front pero guarda en localStorage; no hay servicio clients | S09 (no implementado), informe |
+| R06 | **Brecha declarada.** No hay registro por el administrador | Informe |
+| R07 | **Cubierto** en el backend; el panel del front sigue local | S01, S03, S04 |
+| R08 | **Parcial.** Se emite una boleta numerada con neto e IVA (19 %) al pagar y se ve en `boleta.html`; no se envía por correo | S12, S16, informe |
+| R09 | **Cubierto** en el backend; el panel del front sigue local | S19 |
+| R10 | **Parcial.** Mantenedor de productos sí (S03 a S05); usuarios y clientes no | Informe |
+| R11 (y la validación de correo de R05) | **Brecha declarada.** La validación se simula en `verificar.html`, sin envío real | M7, informe |
+| R12 | **Cubierto.** Sesión con cookie httponly y permisos por rol en el gateway y en cada servicio | S06, S07, S08, M4 |
+| R13 | **Cubierto** en el backend; el panel del front sigue local | S14, S15 |
+
+## 6. Cambios respecto de la versión anterior (INCR-04)
+
+| Servicio | Antes | Ahora (código de `main`) |
+|---|---|---|
+| S02 | Lo usaba la ficha del producto | El front no lo llama: la ficha usa los datos de S01 |
+| S09, S10 | Por confirmar con el PR del servicio clients | No implementados (recorte) |
+| S11 | `direccion_despacho` como texto; respuesta sin `cliente_id`, `creado_en` ni `historial` | `despacho { direccion, comuna, telefono }`; respuesta completa; errores 400 `IDEMPOTENCY_KEY_REQUIRED`, 400 producto repetido, 404 `PRODUCT_NOT_FOUND`, 409 `STOCK_INSUFICIENTE` y 409 `IDEMPOTENCY_CONFLICT` |
+| S12 | Flujo F05, solo dueño y ADMIN; respuesta resumida con `fecha` | Flujo F04 (lo usan Pago y Boleta; Mis pedidos usa S18); también DESPACHO (pedidos pagados); trae `boleta` y `historial` |
+| S14 | Respuesta `{ pedidos }` con `fecha_pago` | `{ pedidos, pagina, total }` con el pedido completo, paginado y ordenado por `creado_en` |
+| S16 | Requisitos R02 y R04; el pago volvía PENDIENTE | Requisitos R02 y R08 (emite la boleta); vuelve APROBADO con la boleta (modo inmediato) o PENDIENTE (modo aviso); se agrega `pedido_sincronizado` y el error 409 `PEDIDO_NO_PAGABLE` |
+| S17 | Sin códigos de error | 401 `INVALID_PROVIDER_SIGNATURE`, 404 `PAYMENT_NOT_FOUND` y estado REVERTIDO |
+| S18 | `misPedidos` devolvía una lista | `misPedidos` devuelve `{ items, pagina, porPagina, total }`; se agrega `pedido(id)`, los límites y los códigos de error |
+| S19 | Contaba por fecha del pedido | Cuenta por `pagado_en`; agrega `producto_id` en el detalle |
+| R08 | Brecha | Parcial (boleta sin correo) |
