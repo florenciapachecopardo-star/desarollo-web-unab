@@ -1,0 +1,106 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.7, pytest-8.3.3, pluggy-1.7.0 -- /usr/local/bin/python3.12
+rootdir: /tests
+plugins: anyio-4.16.0
+collecting ... collected 16 items
+
+test_seguridad.py::test_p01_catalogo_anonimo PASSED                      [  6%]
+test_seguridad.py::test_p02_crear_pedido_sin_sesion PASSED               [ 12%]
+test_seguridad.py::test_p02_identidad_falsa_desde_el_navegador PASSED    [ 18%]
+test_seguridad.py::test_p03_cliente_no_crea_productos PASSED             [ 25%]
+test_seguridad.py::test_p04_pedido_ajeno_rest PASSED                     [ 31%]
+test_seguridad.py::test_p04_pedido_ajeno_igual_que_inexistente PASSED    [ 37%]
+test_seguridad.py::test_p04_pagar_pedido_ajeno PASSED                    [ 43%]
+test_seguridad.py::test_p04_pedido_ajeno_graphql PASSED                  [ 50%]
+test_seguridad.py::test_p05_servicios_internos_sin_secreto PASSED        [ 56%]
+test_seguridad.py::test_p05_secreto_incorrecto PASSED                    [ 62%]
+test_seguridad.py::test_p06_precio_y_estado_alterados PASSED             [ 68%]
+test_seguridad.py::test_idempotencia_pedido_y_pago PASSED                [ 75%]
+test_seguridad.py::test_idempotency_key_obligatorio PASSED               [ 81%]
+test_seguridad.py::test_sin_stock PASSED                                 [ 87%]
+test_seguridad.py::test_inc04_id_mal_formado_no_descuenta_stock PASSED   [ 93%]
+test_seguridad.py::test_graphql_rechaza_consulta_muy_profunda PASSED     [100%]
+
+==================================== PASSES ====================================
+__________________________ test_p01_catalogo_anonimo ___________________________
+----------------------------- Captured stdout call -----------------------------
+[p01] anonimo GET /api/v1/productos -> 200 request_id=p01-e2b05666
+_______________________ test_p02_crear_pedido_sin_sesion _______________________
+----------------------------- Captured stdout call -----------------------------
+[p02] anonimo POST /api/v1/pedidos -> 401 request_id=p02-52acc981
+_________________ test_p02_identidad_falsa_desde_el_navegador __________________
+----------------------------- Captured stdout call -----------------------------
+[p02-identidad] anonimo GET /api/v1/auth/me -> 401 request_id=p02-identidad-5fc1a0c4
+______________________ test_p03_cliente_no_crea_productos ______________________
+----------------------------- Captured stdout call -----------------------------
+[p03] cliente1 POST /api/v1/productos -> 403 request_id=p03-8729a06a
+[p03-verifica] anonimo GET /api/v1/productos -> 200 request_id=p03-verifica-06a0f80b
+__________________________ test_p04_pedido_ajeno_rest __________________________
+----------------------------- Captured stdout call -----------------------------
+[p04] cliente1 GET /api/v1/pedidos/PED-0002 -> 404 request_id=p04-98438604
+_________________ test_p04_pedido_ajeno_igual_que_inexistente __________________
+----------------------------- Captured stdout call -----------------------------
+[p04-ajeno] cliente1 GET /api/v1/pedidos/PED-0002 -> 404 request_id=p04-ajeno-d6a53214
+[p04-inexistente] cliente1 GET /api/v1/pedidos/PED-9999 -> 404 request_id=p04-inexistente-cde6ce21
+_________________________ test_p04_pagar_pedido_ajeno __________________________
+----------------------------- Captured stdout call -----------------------------
+[p04-pago] cliente1 POST /api/v1/pagos -> 404 request_id=p04-pago-74caeebd
+________________________ test_p04_pedido_ajeno_graphql _________________________
+----------------------------- Captured stdout call -----------------------------
+[p04-graphql] cliente1 POST /api/v1/graphql -> 200 request_id=p04-graphql-492ccfc7
+___________________ test_p05_servicios_internos_sin_secreto ____________________
+----------------------------- Captured stdout call -----------------------------
+[p05] directo a inventory -> 403
+[p05] directo a orders -> 403
+[p05] directo a payments -> 403
+_________________________ test_p05_secreto_incorrecto __________________________
+----------------------------- Captured stdout call -----------------------------
+[p05] inventory con secreto falso -> 403
+______________________ test_p06_precio_y_estado_alterados ______________________
+----------------------------- Captured stdout call -----------------------------
+[p06] cliente1 POST /api/v1/pedidos -> 201 request_id=p06-58898f29
+[p06-pago] cliente1 POST /api/v1/pagos -> 201 request_id=p06-pago-aad504b7
+_______________________ test_idempotencia_pedido_y_pago ________________________
+----------------------------- Captured stdout call -----------------------------
+[stock] anonimo GET /api/v1/productos/650000000000000000000002 -> 200 request_id=stock-0248466a
+[idem-pedido-1] cliente1 POST /api/v1/pedidos -> 201 request_id=idem-pedido-1-7410ee28
+[idem-pedido-2] cliente1 POST /api/v1/pedidos -> 201 request_id=idem-pedido-2-f4b4bf70
+[stock] anonimo GET /api/v1/productos/650000000000000000000002 -> 200 request_id=stock-ab857ae7
+[idem-conflicto] cliente1 POST /api/v1/pedidos -> 409 request_id=idem-conflicto-0c233c4f
+[idem-pago-1] cliente1 POST /api/v1/pagos -> 201 request_id=idem-pago-1-4cd46fa4
+[idem-pago-2] cliente1 POST /api/v1/pagos -> 201 request_id=idem-pago-2-02144115
+[idem-pago-3] cliente1 POST /api/v1/pagos -> 409 request_id=idem-pago-3-bccb810c
+_______________________ test_idempotency_key_obligatorio _______________________
+----------------------------- Captured stdout call -----------------------------
+[idem-sin-clave] cliente1 POST /api/v1/pedidos -> 400 request_id=idem-sin-clave-5a16998c
+________________________________ test_sin_stock ________________________________
+----------------------------- Captured stdout call -----------------------------
+[sin-stock] cliente1 POST /api/v1/pedidos -> 409 request_id=sin-stock-87c8a4fb
+_________________ test_inc04_id_mal_formado_no_descuenta_stock _________________
+----------------------------- Captured stdout call -----------------------------
+[stock] anonimo GET /api/v1/productos/650000000000000000000002 -> 200 request_id=stock-ecd69b0e
+[inc04] cliente1 POST /api/v1/pedidos -> 400 request_id=inc04-7853e5b1
+[stock] anonimo GET /api/v1/productos/650000000000000000000002 -> 200 request_id=stock-fa1ed091
+__________________ test_graphql_rechaza_consulta_muy_profunda __________________
+----------------------------- Captured stdout call -----------------------------
+[gql-profundidad] cliente1 POST /api/v1/graphql -> 200 request_id=gql-profundidad-6499d5e0
+[gql-profundidad] error: 'anonymous' exceeds maximum operation depth of 6
+-------------------- generated xml file: /salida/junit.xml ---------------------
+=========================== short test summary info ============================
+PASSED test_seguridad.py::test_p01_catalogo_anonimo
+PASSED test_seguridad.py::test_p02_crear_pedido_sin_sesion
+PASSED test_seguridad.py::test_p02_identidad_falsa_desde_el_navegador
+PASSED test_seguridad.py::test_p03_cliente_no_crea_productos
+PASSED test_seguridad.py::test_p04_pedido_ajeno_rest
+PASSED test_seguridad.py::test_p04_pedido_ajeno_igual_que_inexistente
+PASSED test_seguridad.py::test_p04_pagar_pedido_ajeno
+PASSED test_seguridad.py::test_p04_pedido_ajeno_graphql
+PASSED test_seguridad.py::test_p05_servicios_internos_sin_secreto
+PASSED test_seguridad.py::test_p05_secreto_incorrecto
+PASSED test_seguridad.py::test_p06_precio_y_estado_alterados
+PASSED test_seguridad.py::test_idempotencia_pedido_y_pago
+PASSED test_seguridad.py::test_idempotency_key_obligatorio
+PASSED test_seguridad.py::test_sin_stock
+PASSED test_seguridad.py::test_inc04_id_mal_formado_no_descuenta_stock
+PASSED test_seguridad.py::test_graphql_rechaza_consulta_muy_profunda
+============================== 16 passed in 1.05s ==============================
