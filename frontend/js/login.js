@@ -63,7 +63,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (sesion.tipo === "CLIENTE") {
             // Si venía redirigido desde una página protegida, vuelve allí.
             const volver = new URLSearchParams(window.location.search).get("volver");
-            window.location.href = volver && !volver.includes("//") ? volver : "index.html";
+            // Solo se vuelve a una página propia (evita redirigir a otro sitio o ejecutar javascript:)
+            window.location.href = volver && /^[a-z0-9-]+\.html(\?[\w=&%.-]*)?$/i.test(volver) ? volver : "index.html";
         } else {
             window.location.href = inicioSegunPerfil(sesion.perfil);
         }
