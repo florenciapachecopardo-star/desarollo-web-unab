@@ -80,6 +80,7 @@ PEDIDOS = [
 # PED-0001 viene pagado: tiene su pago aprobado y su boleta
 _ped1 = PEDIDOS[0]
 _ped1["pago_id"] = "PAG-0001"
+_ped1["pagado_en"] = _ped1["creado_en"]
 _ped1["boleta"] = boleta_de(_ped1["total"], "B-000001", _ped1["creado_en"])
 
 PAGOS = [
