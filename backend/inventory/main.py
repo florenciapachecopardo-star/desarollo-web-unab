@@ -5,6 +5,7 @@ from typing import Optional
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import Depends, FastAPI, Header, Query, Request
+from pydantic import BaseModel, Field
 
 from database import productos_collection
 from models import Categoria, ProductoModel, ProductoUpdateModel
@@ -17,6 +18,11 @@ INTERNAL_GATEWAY_SECRET = os.getenv("INTERNAL_GATEWAY_SECRET")
 if not INTERNAL_GATEWAY_SECRET:
     raise RuntimeError("INTERNAL_GATEWAY_SECRET no esta configurado")
 
+# Secreto propio de la integracion orders -> inventory (distinto al del gateway)
+ORDERS_INVENTORY_SECRET = os.getenv("ORDERS_INVENTORY_SECRET")
+if not ORDERS_INVENTORY_SECRET:
+    raise RuntimeError("ORDERS_INVENTORY_SECRET no esta configurado")
+
 app = FastAPI(title="Chocomania inventory")
 instalar(app, SERVICE, confiar_identidad=True)
 
@@ -24,6 +30,11 @@ instalar(app, SERVICE, confiar_identidad=True)
 def verify_gateway(x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+
+
+def verify_orders(x_service_secret: str = Header(default="")):
+    if not secrets.compare_digest(x_service_secret, ORDERS_INVENTORY_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solo orders puede usar esta operacion")
 
 
 def verify_admin(x_authenticated_roles: str = Header(default="")):
@@ -106,3 +117,59 @@ async def eliminar_producto(id: str):
     if resultado.deleted_count == 0:
         raise no_encontrado()
     return {"mensaje": "Producto eliminado correctamente"}
+
+
+# ---------------------------------------------------------------------------
+# Operaciones internas para orders (no estan en la lista blanca del gateway)
+# ---------------------------------------------------------------------------
+
+class ItemStock(BaseModel):
+    producto_id: str = Field(min_length=1, max_length=64)
+    cantidad: int = Field(ge=1, le=20)
+
+
+class SolicitudStock(BaseModel):
+    items: list[ItemStock] = Field(min_length=1, max_length=20)
+
+
+async def devolver_items(items: list[tuple[ObjectId, int]]):
+    for oid, cantidad in items:
+        await productos_collection.update_one({"_id": oid}, {"$inc": {"stock": cantidad}})
+
+
+@app.post("/interno/reservas", dependencies=[Depends(verify_orders)])
+async def reservar_stock(solicitud: SolicitudStock):
+    """Descuenta el stock de cada item y devuelve el precio vigente.
+
+    Cada descuento es atomico (solo baja si alcanza). Si un item falla, se
+    devuelven los que ya se habian descontado.
+    """
+    reservados: list[tuple[ObjectId, int]] = []
+    resultado = []
+    for item in solicitud.items:
+        oid = parse_id(item.producto_id)
+        producto = await productos_collection.find_one_and_update(
+            {"_id": oid, "stock": {"$gte": item.cantidad}},
+            {"$inc": {"stock": -item.cantidad}},
+        )
+        if producto is None:
+            await devolver_items(reservados)
+            existe = await productos_collection.find_one({"_id": oid})
+            if existe is None:
+                raise ApiError(404, "PRODUCT_NOT_FOUND", "Producto no encontrado")
+            raise ApiError(409, "STOCK_INSUFICIENTE",
+                           f"No hay stock suficiente de {existe.get('nombre')} (quedan {existe.get('stock', 0)})")
+        reservados.append((oid, item.cantidad))
+        resultado.append({
+            "producto_id": str(oid),
+            "nombre": producto["nombre"],
+            "precio_unitario": producto["precio"],
+            "cantidad": item.cantidad,
+        })
+    return {"items": resultado}
+
+
+@app.post("/interno/devoluciones", dependencies=[Depends(verify_orders)])
+async def devolver_stock(solicitud: SolicitudStock):
+    await devolver_items([(parse_id(i.producto_id), i.cantidad) for i in solicitud.items])
+    return {"status": "OK"}
