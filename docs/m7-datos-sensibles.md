@@ -1,6 +1,6 @@
 # M7. Datos sensibles
 
-**Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Solo faltan los resultados de las 6 pruebas de seguridad (sección 7), que llegan con las pruebas automáticas de Flo.
+**Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Las 6 pruebas de seguridad (sección 7) se ejecutaron el 08-11-2026 con pytest y pasaron todas (E07).
 
 **Cambio respecto del borrador:** el servicio clients no se implementó (S09 y S10). Por eso RUN, fecha de nacimiento y sexo **no llegan al backend**, y la dirección y el teléfono solo existen como copia de despacho dentro del pedido. La columna "Estado en la U2" dice qué está construido y qué es diseño.
 
@@ -61,16 +61,16 @@ El Caso 19 pide comprobar con una API de mensajería que el correo existe y est�
 
 ## 7. Pruebas de seguridad
 
-Detalle de cada una en `docs/protocolo-pruebas.md`. Los resultados se completan cuando Flo ejecute las pruebas automáticas. Donde ya hay una evidencia que cubre el caso, se indica.
+Detalle de cada una en `docs/protocolo-pruebas.md` y código en `tests/api/test_seguridad.py`. Se ejecutan con `docker compose run --rm pruebas` sobre la base reseteada. Resultado: 16 de 16 pruebas aprobadas (las 6 de esta tabla y 10 casos más), ficha en `evidencias/u2/pytest/ficha-E07.md`.
 
 | ID | Caso | Resultado esperado | Resultado obtenido | Evidencia |
 |---|---|---|---|---|
-| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | 200 sin sesión | E01 |
-| P02 | Operación protegida sin sesión (S11) | 401 | Pendiente | |
-| P03 | CLIENTE intenta una operación de ADMIN (S03) | 403 | Pendiente | |
-| P04 | CLIENTE consulta un pedido ajeno (S12) | 404 sin datos del pedido | Pendiente | |
-| P05 | Llamada directa a un servicio interno sin pasar por el gateway | Rechazada | Pendiente | |
-| P06 | El front manda un precio o estado alterado (S11) | El servidor lo ignora y usa el precio de inventory | Pendiente. E02 muestra el precio tomado de inventory, pero sin el envío alterado | E02 (parcial) |
+| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | **Aprobada:** 200 sin sesión | E01, E07 |
+| P02 | Operación protegida sin sesión (S11) | 401 | **Aprobada:** 401 con formato de error único. También 401 si el navegador manda una identidad falsa (`X-Authenticated-User`) | E07 |
+| P03 | CLIENTE intenta una operación de ADMIN (S03) | 403 | **Aprobada:** 403 y el producto no se crea | E07 |
+| P04 | CLIENTE consulta un pedido ajeno (S12) | 404 sin datos del pedido | **Aprobada:** 404 `ORDER_NOT_FOUND` igual que un pedido inexistente; también 404 al pagarlo (S16) y `null` por GraphQL (S18) | E07 |
+| P05 | Llamada directa a un servicio interno sin pasar por el gateway | Rechazada | **Aprobada:** inventory, orders y payments responden 403 sin el secreto o con uno inventado | E07 |
+| P06 | El front manda un precio o estado alterado (S11) | El servidor lo ignora y usa el precio de inventory | **Aprobada:** precio 8990 de inventory, estado PENDIENTE_PAGO y cajero USR-0005 pese a lo enviado; el pago usa el monto de orders | E07 |
 
 ## 8. Riesgos y brechas de datos
 
@@ -82,3 +82,4 @@ Detalle de cada una en `docs/protocolo-pruebas.md`. Los resultados se completan 
 | Vault en modo dev y solo para el gateway | Los demás servicios reciben sus secretos por variables de entorno | Brecha declarada (M6) |
 | Cookie sin `secure` | El entorno local usa HTTP | Se activa con `COOKIE_SECURE=true` al usar HTTPS |
 | Cola de despacho con montos | S14 devuelve el pedido completo | Mejora para la U3 (vista reducida) |
+| Identidad falsa en los logs de una llamada rechazada | En P05, inventory, orders y payments registran el `user_id` del header falso aunque rechazan la llamada (403) | No da acceso a nada; en la U3, el log no debería tomar ese header si falta el secreto |

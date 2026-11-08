@@ -41,7 +41,7 @@ Se fijan **antes** de medir. Si una medición no los cumple, se registra como in
 
 ## 4. Prueba de carga con k6
 
-**Script:** `tests/carga/catalogo.js` (lo escribe Karla, lo ejecuta Flo).
+**Script:** `tests/carga/catalogo.js`. Se ejecuta con el servicio `k6` de `docker-compose.yml`.
 
 **Escenario:**
 
@@ -51,33 +51,35 @@ Se fijan **antes** de medir. Si una medición no los cumple, se registra como in
 
 Cada usuario virtual hace `GET /api/v1/productos` a través del gateway y espera 1 segundo entre solicitudes.
 
-**Cómo se mide CPU y memoria:** mientras corre k6, `docker stats --no-stream` cada 10 segundos, guardado en `evidencias/u2/k6-docker-stats.txt`.
+**CPU y memoria:** el plan era registrar `docker stats` durante la prueba, pero no se hizo; esos dos indicadores quedan sin dato.
 
-**Cómo reproducirlo:**
+**Cómo reproducirlo** (todo dentro de Docker, sin instalar k6):
 
-1. `docker compose up -d` (levanta el stack)
-2. `scripts/reset.sh` (deja la base en el estado inicial y carga el seed; necesita el stack arriba)
-3. `k6 run tests/carga/catalogo.js`
-4. Guardar la salida en `evidencias/u2/k6-catalogo.txt`
+1. `docker compose up -d --build`
+2. `docker compose run --rm seed --reset` (estado inicial con el seed)
+3. `docker compose run --rm k6` (guarda el resumen en `evidencias/u2/k6-catalogo.json`)
 
 ### Resultados
 
-_Pendiente de ejecución. Se completa cuando Flo corra el script._
+Ficha: `evidencias/u2/ficha-E08.md`. Se ejecutó dos veces: la primera no cumplió los umbrales y se registró como incidencia (INC06); la segunda, con el arreglo, sí. Los umbrales no se cambiaron.
 
-| Indicador | Umbral | Resultado | ¿Cumple? |
-|---|---|---|---|
-| p95 catálogo | < 500 ms | | |
-| Throughput catálogo | ≥ 25 req/s | | |
-| Tasa de errores | < 1% | | |
-| CPU máxima (gateway / inventory) | Sin reinicios | | |
-| Memoria máxima (gateway / inventory) | Sin reinicios | | |
+| Indicador | Umbral | Primera ejecución (`739419c`) | Segunda ejecución (`3c8d960`) | ¿Cumple? |
+|---|---|---|---|---|
+| p95 catálogo | < 500 ms | 3.163 ms | 19,2 ms | Sí (después del arreglo) |
+| Throughput catálogo | ≥ 25 req/s | 22,2 req/s | 65,0 req/s | Sí (después del arreglo) |
+| Tasa de errores | < 1% | 0 % | 0 % | Sí |
+| CPU máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sin dato |
+| Memoria máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sin dato |
 
-**Fecha de ejecución:**
-**Commit:**
-**Equipo donde se ejecutó:** (procesador, RAM, sistema operativo)
+**Qué pasó en la primera ejecución:** el gateway creaba un cliente HTTP nuevo (`httpx.AsyncClient`) en cada solicitud, y armar ese cliente cada vez saturaba su CPU. Con 100 usuarios, cada respuesta tardaba unos 2 segundos. Se cambió a un solo cliente compartido para todo el gateway (INC06) y el p95 bajó de 3,2 s a 19 ms.
+
+**Fecha de ejecución:** 08-11-2026, 18:17 y 18:35 (America/Santiago)
+**Archivos:** `evidencias/u2/k6-catalogo-antes.json` y `evidencias/u2/k6-catalogo.json`
+**Equipo donde se ejecutó:** computador Dell con Windows y Docker Desktop (k6 dentro de Docker, en el mismo equipo que el stack)
 
 ## 5. Límites de esta caracterización
 
 - Las cifras de las secciones 1 y 2 son supuestos, no datos reales de un negocio.
-- La prueba corre en un computador personal con todos los servicios en Docker. No representa un servidor de producción.
+- La prueba corre en un computador personal con todos los servicios en Docker, y k6 corre en el mismo equipo. No representa un servidor de producción.
+- Orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud, igual que el gateway antes de INC06. No afecta al catálogo, pero puede pesar si se someten a carga pedidos y pagos.
 - Solo se prueba el catálogo. Pedidos y pagos no se someten a carga en la U2.

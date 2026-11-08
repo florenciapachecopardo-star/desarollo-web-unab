@@ -83,7 +83,7 @@ Matriz de todas las rutas públicas con método, acceso, servicio destino y cont
 
 **Documento:** [`m7-datos-sensibles.md`](m7-datos-sensibles.md)
 
-Cinco niveles de clasificación y una matriz de datos con finalidad, custodio, roles, protección, retención y estado real en la U2. Chocomanía no custodia secretos del cliente (no recibe datos de tarjeta). Incluye la minimización, el recorrido de la dirección de despacho, la verificación de correo simulada, las 6 pruebas de seguridad (P01 a P06) y los riesgos de datos que quedan abiertos.
+Cinco niveles de clasificación y una matriz de datos con finalidad, custodio, roles, protección, retención y estado real en la U2. Chocomanía no custodia secretos del cliente (no recibe datos de tarjeta). Incluye la minimización, el recorrido de la dirección de despacho, la verificación de correo simulada, las 6 pruebas de seguridad (P01 a P06, todas aprobadas con pytest en E07) y los riesgos de datos que quedan abiertos.
 
 ## M8. GraphQL Gateway
 
@@ -97,6 +97,8 @@ GraphQL Gateway privado (Strawberry) detrás del API Gateway, con las queries `m
 
 Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al catálogo por día en peak, menos de 25 solicitudes por segundo. Umbrales fijados antes de medir (p95 del catálogo menor a 500 ms, de crear pedido menor a 1.000 ms, errores menores a 1 %). Script k6 del catálogo en `tests/carga/catalogo.js`.
 
+**Medición (E08):** la primera ejecución no cumplió los umbrales (p95 de 3,2 s y 22 solicitudes por segundo) porque el gateway creaba un cliente HTTP por solicitud (INC06). Con el arreglo, el catálogo cumple con holgura: p95 de 19 ms, 65 solicitudes por segundo y 0 % de errores. Los umbrales no se cambiaron.
+
 - **ADR gRPC:** no se usa. Con esta carga, HTTP con JSON entre servicios alcanza y es más fácil de depurar y correlacionar.
 - **ADR analítica:** el reporte de ventas es un endpoint dentro de orders (S19), no un servicio aparte.
 
@@ -106,7 +108,7 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 
 | Componente | Qué hace | Evidencia |
 |---|---|---|
-| gateway | Lista blanca, sesión por cookie, identidad hacia los servicios, `X-Request-ID`, logs JSON, errores con formato único, secretos desde Vault, front estático en el mismo origen | E01 |
+| gateway | Lista blanca, sesión por cookie, identidad hacia los servicios, `X-Request-ID`, logs JSON, errores con formato único, secretos desde Vault, front estático en el mismo origen, un solo cliente HTTP (INC06) | E01, E07, E08 |
 | auth | Usuarios y sesiones en Mongo, bcrypt costo 12, token guardado como hash, TTL de 900 s | E02 a E06 (`/introspect` en cada traza) |
 | inventory | Catálogo, stock, reservas y devoluciones internas, lote para GraphQL | E01, E02, E05 |
 | orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03 |
@@ -116,12 +118,13 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 
 ### Cómo verificarlo
 
-1. Copiar `.env.example` a `.env` y completar los valores.
+1. Copiar `.env.example` a `.env` y completar los valores (en Windows, `scripts/generar-env.py` lo crea con secretos aleatorios).
 2. `docker compose up -d --build` y esperar a que los servicios queden `healthy`.
-3. `scripts/reset.sh` para cargar el seed (6 usuarios y 5 productos con ID fijos).
+3. `docker compose run --rm seed --reset` (o `scripts/reset.sh`) para cargar el seed (6 usuarios y 5 productos con ID fijos).
 4. Abrir `http://localhost:8000`, iniciar sesión con `cliente@correo.cl` y comprar un producto.
 5. Copiar el `X-Request-ID` de cualquier respuesta y ejecutar `scripts/logs.sh <request_id>` para ver la traza en todos los servicios.
 6. Revisar la base con `docker compose run --rm check pedido PED-0003`.
+7. Correr las pruebas automáticas con `docker compose run --rm pruebas` (16 pruebas, E07) y la carga con `docker compose run --rm k6` (E08), cada una sobre la base reseteada.
 
 ### Lo que no está en la U2
 
@@ -135,7 +138,7 @@ Cada cambio está en [`bitacora.md`](bitacora.md) (INCR-00 en adelante) y las fa
 
 **Documento:** [`matriz-requisitos.md`](matriz-requisitos.md)
 
-Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04 y R08 (en parte) tienen evidencia aprobada; R07, R09, R10, R12 y R13 tienen el servicio implementado y la prueba pendiente; R05, R06 y R11 son brechas.
+Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04, R07 y R12 tienen evidencia aprobada, y R08 en parte; R09, R10 y R13 tienen el servicio implementado pero sin evidencia (no tienen pantalla); R05, R06 y R11 son brechas.
 
 ## Brechas declaradas
 
@@ -152,16 +155,15 @@ Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01
 | Cookie sin `secure` en local | No hay HTTPS en local | M6, M7 |
 | Sin límite de solicitudes (rate limit) | Pasa a la Etapa 4 | M6 |
 | Sin pruebas con Playwright | Pasa a la U3; en la U2, evidencia manual | Protocolo de pruebas |
-| Stock descontado sin devolver si un pedido trae un ID mal formado (INC04) | Encontrado en la revisión del 08-11 | Incidencias |
 | Stock descontado sin pedido si inventory responde después del plazo de orders | Requiere reservas con ID propio | M3 |
 | GraphQL: `stock` no lo puede ver nadie (las queries son solo de CLIENTE), lote máximo de 50 productos e introspección activa | Decisiones de alcance | M8 |
 | Cuentas de prueba con sus claves visibles en el login | Facilitan la demo; son ficticias | M7 |
-| Carga medida con k6 pendiente; solo hay proyección | Falta ejecutar el script | M9 |
-| Pruebas P02 a P06 sin ejecutar y evidencias faltantes (reintento idempotente, rechazo por profundidad, capturas del front) | Pendientes de ejecución | M7, matriz de requisitos |
+| CPU y memoria no medidas en la prueba de carga; orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud | Solo se sometió a carga el catálogo | M9 |
+| Sin evidencia de la cola de despacho, el reporte de ventas, el mantenedor de productos como ADMIN ni capturas del front | No tienen pantalla o faltó guardar la captura | Matriz de requisitos |
 
 ## Anexos y evidencias
 
-- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E06, cada una con su ficha).
+- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E08, cada una con su ficha).
 - Protocolo de pruebas: [`protocolo-pruebas.md`](protocolo-pruebas.md).
 - Incidencias: [`incidencias.md`](incidencias.md).
 - Bitácora de incrementos: [`bitacora.md`](bitacora.md).
