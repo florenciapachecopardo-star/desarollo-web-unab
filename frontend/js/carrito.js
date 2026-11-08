@@ -1,6 +1,8 @@
 // Carrito de compras. Antes vivía en la URL; ahora vive en localStorage para
 // poder manejar cantidades y conservarse entre páginas.
-// Formato: [{ id, cantidad }].
+// Formato: [{ id, cantidad }]. El id es el del producto en el servidor (texto).
+// El carrito sí vive en el navegador: es la intención de compra, no un dato del negocio.
+// El precio y el total los vuelve a calcular el servidor al crear el pedido.
 
 const CLAVE_CARRITO = "choco:carrito";
 
@@ -21,11 +23,11 @@ function guardarCarrito(carrito) {
 
 function agregarAlCarrito(id) {
     const carrito = leerCarrito();
-    const linea = carrito.find((item) => item.id === Number(id));
+    const linea = carrito.find((item) => String(item.id) === String(id));
     if (linea) {
         linea.cantidad += 1;
     } else {
-        carrito.push({ id: Number(id), cantidad: 1 });
+        carrito.push({ id: String(id), cantidad: 1 });
     }
     guardarCarrito(carrito);
     return contarCarrito();
@@ -33,14 +35,14 @@ function agregarAlCarrito(id) {
 
 function cambiarCantidad(id, cantidad) {
     const carrito = leerCarrito();
-    const linea = carrito.find((item) => item.id === Number(id));
+    const linea = carrito.find((item) => String(item.id) === String(id));
     if (!linea) return;
     linea.cantidad = Math.max(1, cantidad);
     guardarCarrito(carrito);
 }
 
 function quitarDelCarrito(id) {
-    const carrito = leerCarrito().filter((item) => item.id !== Number(id));
+    const carrito = leerCarrito().filter((item) => String(item.id) !== String(id));
     guardarCarrito(carrito);
 }
 
@@ -75,7 +77,8 @@ function detalleCarrito() {
         });
     });
 
-    if (cambio) {
+    // Solo se limpian líneas si el catálogo llegó bien del servidor (si no, no se pierde el carrito)
+    if (cambio && typeof catalogoCargado !== "undefined" && catalogoCargado) {
         guardarCarrito(detalle.map((item) => ({ id: item.id, cantidad: item.cantidad })));
     }
     return detalle;
@@ -96,4 +99,7 @@ function actualizarContadorCabecera() {
         : "Carrito (" + cantidad + ") " + formatearPrecio(totalCarrito());
 }
 
-document.addEventListener("DOMContentLoaded", actualizarContadorCabecera);
+document.addEventListener("DOMContentLoaded", async () => {
+    if (typeof catalogoListo !== "undefined") await catalogoListo;
+    actualizarContadorCabecera();
+});

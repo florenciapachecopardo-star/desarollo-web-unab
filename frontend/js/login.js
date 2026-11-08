@@ -1,5 +1,5 @@
-// Pantalla de ingreso. Al enviar, intenta iniciar sesión y redirige según el
-// perfil. Muestra las cuentas de prueba y permite completarlas con un clic.
+// Pantalla de ingreso. Inicia sesión contra el servidor (S06 y S08) y redirige
+// según el perfil. Muestra las cuentas de prueba y permite completarlas con un clic.
 
 const CUENTAS_PRUEBA = [
     { etiqueta: "Cliente", correo: "cliente@correo.cl", clave: "Cliente2026" },
@@ -32,7 +32,14 @@ document.addEventListener("DOMContentLoaded", () => {
         lista.appendChild(item);
     });
 
-    form.addEventListener("submit", (evento) => {
+    // Si llegó porque la sesión expiró, se avisa.
+    if (new URLSearchParams(window.location.search).get("expirada")) {
+        error.textContent = "Tu sesión expiró. Ingresa de nuevo para continuar.";
+    }
+
+    const boton = form.querySelector("button[type=submit]");
+
+    form.addEventListener("submit", async (evento) => {
         evento.preventDefault();
         error.textContent = "";
 
@@ -41,14 +48,14 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const resultado = iniciarSesion(correo.value.trim(), clave.value);
+        boton.disabled = true;
+        boton.textContent = "Ingresando…";
+        const resultado = await iniciarSesionApi(correo.value.trim(), clave.value);
+        boton.disabled = false;
+        boton.textContent = "Ingresar";
 
         if (!resultado.ok) {
-            error.textContent = resultado.mensaje;
-            // Si el correo no está verificado, ofrece ir a verificarlo.
-            if (resultado.verificarId) {
-                window.location.href = "verificar.html?id=" + resultado.verificarId;
-            }
+            escribirError(error, resultado);
             return;
         }
 
@@ -56,7 +63,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (sesion.tipo === "CLIENTE") {
             // Si venía redirigido desde una página protegida, vuelve allí.
             const volver = new URLSearchParams(window.location.search).get("volver");
-            window.location.href = volver || "index.html";
+            // Solo se vuelve a una página propia (evita redirigir a otro sitio o ejecutar javascript:)
+            window.location.href = volver && /^[a-z0-9-]+\.html(\?[\w=&%.-]*)?$/i.test(volver) ? volver : "index.html";
         } else {
             window.location.href = inicioSegunPerfil(sesion.perfil);
         }

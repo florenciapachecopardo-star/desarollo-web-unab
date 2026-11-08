@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from observabilidad import REQUEST_ID_HEADER, ApiError, instalar, log, request_id_de
 
@@ -22,6 +23,8 @@ GRAPHQL_URL = os.getenv("GRAPHQL_URL", "http://graphql-gateway:8000")
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
 VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+# Carpeta del front: el gateway lo sirve en el mismo origen que la API (sin CORS)
+FRONTEND_DIR = os.getenv("FRONTEND_DIR", "")
 
 if not VAULT_TOKEN:
     raise RuntimeError("VAULT_TOKEN no configurado")
@@ -261,3 +264,12 @@ async def logout(request: Request):
     respuesta = JSONResponse(content={"status": "OK"})
     respuesta.delete_cookie("session_token")
     return respuesta
+
+
+# ---------------------------------------------------------------------------
+# Front estatico en el mismo origen (http://localhost:8000/). Va al final, para que
+# las rutas de la API tengan prioridad. Solo sirve archivos de FRONTEND_DIR.
+# ---------------------------------------------------------------------------
+
+if FRONTEND_DIR and os.path.isdir(FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
