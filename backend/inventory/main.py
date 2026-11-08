@@ -155,10 +155,12 @@ async def reservar_stock(solicitud: SolicitudStock):
     Cada descuento es atomico (solo baja si alcanza). Si un item falla, se
     devuelven los que ya se habian descontado.
     """
+    # INC04: se validan todos los ID antes de descontar, para que un ID mal formado
+    # no deje descontado el stock de los productos anteriores
+    oids = [parse_id(item.producto_id) for item in solicitud.items]
     reservados: list[tuple[ObjectId, int]] = []
     resultado = []
-    for item in solicitud.items:
-        oid = parse_id(item.producto_id)
+    for item, oid in zip(solicitud.items, oids):
         producto = await productos_collection.find_one_and_update(
             {"_id": oid, "stock": {"$gte": item.cantidad}},
             {"$inc": {"stock": -item.cantidad}},

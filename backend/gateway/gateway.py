@@ -32,6 +32,16 @@ if not VAULT_TOKEN:
 app = FastAPI(title="API Gateway de Chocomania")
 instalar(app, SERVICE, confiar_identidad=False)
 
+# INC06: un solo cliente HTTP para todo el gateway, en vez de crear uno por solicitud.
+# Crear un AsyncClient arma su configuracion TLS y su pool de conexiones cada vez,
+# y eso saturaba la CPU del gateway en la prueba de carga.
+_http = httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT)
+
+
+@app.on_event("shutdown")
+async def cerrar_http():
+    await _http.aclose()
+
 
 # ---------------------------------------------------------------------------
 # Lista blanca de rutas (M6). Lo que no esta aqui responde 404 o 405.
@@ -96,11 +106,10 @@ async def secretos(request: Request) -> dict:
         return _cache_secretos["datos"]
 
     try:
-        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
-            resp = await client.get(
+        resp = await _http.get(
                 f"{VAULT_ADDR}/v1/secret/data/gateway",
-                headers={"X-Vault-Token": VAULT_TOKEN, REQUEST_ID_HEADER: request_id_de(request)},
-            )
+            headers={"X-Vault-Token": VAULT_TOKEN, REQUEST_ID_HEADER: request_id_de(request)},
+        )
     except httpx.RequestError:
         log(SERVICE, level="error", event="vault_unavailable", request_id=request_id_de(request))
         raise ApiError(503, "SECRETS_UNAVAILABLE", "Servicio no disponible por el momento")
@@ -128,8 +137,7 @@ async def llamar_auth(request: Request, ruta: str, body: dict, con_secreto: bool
     if con_secreto:
         headers["X-Gateway-Secret"] = (await secretos(request))["auth_introspection_secret"]
     try:
-        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
-            return await client.post(f"{AUTH_URL}{ruta}", json=body, headers=headers)
+        return await _http.post(f"{AUTH_URL}{ruta}", json=body, headers=headers)
     except httpx.TimeoutException:
         raise ApiError(504, "UPSTREAM_TIMEOUT", "El servicio de autenticacion no respondio a tiempo")
     except httpx.RequestError:
@@ -181,14 +189,13 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
             headers[nombre] = request.headers[nombre]
 
     try:
-        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
-            upstream = await client.request(
-                ruta.method,
-                f"{destino.url}{ruta_interna}",
-                params=request.query_params,
-                content=await request.body(),
-                headers=headers,
-            )
+        upstream = await _http.request(
+            ruta.method,
+            f"{destino.url}{ruta_interna}",
+            params=request.query_params,
+            content=await request.body(),
+            headers=headers,
+        )
     except httpx.TimeoutException:
         raise ApiError(504, "UPSTREAM_TIMEOUT", f"El servicio {ruta.destino} no respondio a tiempo")
     except httpx.RequestError:

@@ -112,6 +112,44 @@ services:
       mongo:
         condition: service_healthy
 
+  # Pruebas automaticas P01 a P06, idempotencia, GraphQL e INC04 (tests/api).
+  # Llama al gateway como un navegador y, para P05, directo a los servicios de la red privada.
+  # Guarda la salida en evidencias/u2/pytest/:
+  #   docker compose run --rm seed --reset
+  #   docker compose run --rm pruebas
+  pruebas:
+    build: ./tests/api
+    image: chocomania-pruebas:dev
+    profiles: ["herramientas"]
+    volumes:
+      - ./tests/api:/tests:ro
+      - ./evidencias/u2/pytest:/salida
+    environment:
+      BASE_URL: http://gateway:8000
+      INVENTORY_URL: http://inventory:8000
+      ORDERS_URL: http://orders:8000
+      PAYMENTS_URL: http://payments:8000
+    networks: [publica, privada]
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # Prueba de carga del catalogo (M9). Guarda evidencias/u2/k6-catalogo.json:
+  #   docker compose run --rm k6
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ["herramientas"]
+    user: "0:0"
+    working_dir: /repo
+    command: ["run", "-e", "BASE_URL=http://gateway:8000", "tests/carga/catalogo.js"]
+    volumes:
+      - ./tests/carga:/repo/tests/carga:ro
+      - ./evidencias/u2:/repo/evidencias/u2
+    networks: [publica]
+    depends_on:
+      gateway:
+        condition: service_healthy
+
   inventory:
     build: ./backend/inventory
     image: chocomania-inventory:dev

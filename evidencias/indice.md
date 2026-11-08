@@ -12,6 +12,8 @@ Cada evidencia tiene su ficha, hecha con `evidencias/plantilla-ficha.md`. Las de
 | E04 | Aviso de pago (S17) con orders caído: el pago no se pierde y el pedido queda PAGADO al volver orders (reconciliación). También muestra un `X-Request-ID` generado por el gateway. Aprobada | M3, M10 | `u2/pago-orders-caido/ficha-E04.md` | `u2/pago-orders-caido/logs.txt`, `u2/pago-orders-caido/persistencia-pago.txt`, `u2/pago-orders-caido/persistencia-pedido.txt` |
 | E05 | `misPedidos` por GraphQL (S18) junta orders e inventory con una sola llamada a inventory (DataLoader). Aprobada | M8, M10 | `u2/graphql-agregacion/ficha-E05.md` | `u2/graphql-agregacion/respuesta.json`, `u2/graphql-agregacion/logs.txt` |
 | E06 | `misPedidos` con inventory caído: pedidos visibles y `producto` null con `UPSTREAM_UNAVAILABLE` (error parcial). Aprobada | M8, M10 | `u2/graphql-error-parcial/ficha-E06.md` | `u2/graphql-error-parcial/respuesta.json`, `u2/graphql-error-parcial/logs.txt` |
+| E07 | 16 pruebas automáticas con pytest: P01 a P06, idempotencia de S11 y S16, Idempotency-Key obligatorio, sin stock, INC04 y rechazo por profundidad en GraphQL. Aprobada (16 de 16) | M4, M7, M8, M10 | `u2/pytest/ficha-E07.md` | `u2/pytest/resultado.txt`, `u2/pytest/junit.xml`, `u2/pytest/logs.txt` |
+| E08 | Carga del catálogo con k6: primera ejecución fallida (p95 3,2 s, INC06) y segunda aprobada después del arreglo (p95 19 ms, 65 req/s, 0 % de errores) | M9 | `u2/ficha-E08.md` | `u2/k6-catalogo-antes.json`, `u2/k6-catalogo.json` |
 
 ## Entrega 3 (U3)
 
