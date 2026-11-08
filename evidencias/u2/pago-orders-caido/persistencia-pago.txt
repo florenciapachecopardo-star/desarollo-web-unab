@@ -1,0 +1,25 @@
+{
+  "encontrado": true,
+  "tipo": "pago",
+  "documento": {
+    "_id": "PAG-0002",
+    "pedido_id": "PED-0003",
+    "cliente_id": "USR-0001",
+    "monto": 8990,
+    "estado": "APROBADO",
+    "proveedor": "simulado",
+    "idempotency_key": "pago-0001",
+    "request_id": "022deb2e4420411f99fc67c6cc7da7cb",
+    "creado_en": "2026-11-08 02:58:27.554000",
+    "pedido_sincronizado": true,
+    "referencia_proveedor": "SIM-1",
+    "resuelto_en": "2026-11-08 02:58:30.730000",
+    "boleta": {
+      "numero": "B-000002",
+      "fecha": "2026-11-08T02:58:36+00:00",
+      "neto": 7555,
+      "iva": 1435,
+      "total": 8990
+    }
+  }
+}

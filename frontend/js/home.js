@@ -1,9 +1,19 @@
-// Página de inicio: pinta los productos destacados desde el catálogo.
+// Página de inicio: pinta el catálogo que viene del servidor (S01).
 // Permite filtrar por categoría con ?categoria=barras.
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const grilla = document.getElementById("grilla-productos");
     const categoria = new URLSearchParams(window.location.search).get("categoria");
+
+    mostrarEstado(grilla, "cargando", "Cargando productos…");
+    const resultado = await catalogoListo;
+
+    if (!resultado.ok) {
+        // Si el servidor falla, no se muestra el catálogo guardado como si estuviera al día
+        mostrarError(grilla, resultado);
+        return;
+    }
+    grilla.textContent = "";
 
     let productos = obtenerProductos();
     if (categoria) {

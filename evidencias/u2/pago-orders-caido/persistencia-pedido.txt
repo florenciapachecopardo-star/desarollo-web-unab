@@ -1,0 +1,49 @@
+{
+  "encontrado": true,
+  "tipo": "pedido",
+  "documento": {
+    "_id": "PED-0003",
+    "cliente_id": "USR-0001",
+    "cajero_id": "USR-0005",
+    "estado": "PAGADO",
+    "lineas": [
+      {
+        "producto_id": "650000000000000000000001",
+        "nombre": "Chocolate Dubai",
+        "precio_unitario": 8990,
+        "cantidad": 1,
+        "subtotal": 8990
+      }
+    ],
+    "total": 8990,
+    "despacho": {
+      "direccion": "Calle Ficticia 1",
+      "comuna": "Providencia",
+      "telefono": null
+    },
+    "idempotency_key": "compra-0001",
+    "request_id": "d136b88588454306aca77157562a5b96",
+    "creado_en": "2026-11-08 02:58:26.818000",
+    "historial": [
+      {
+        "estado": "PENDIENTE_PAGO",
+        "fecha": "2026-11-08 02:58:26.818000",
+        "por": "USR-0001"
+      },
+      {
+        "estado": "PAGADO",
+        "fecha": "2026-11-08 02:58:36.020000",
+        "por": "payments"
+      }
+    ],
+    "stock_devuelto": false,
+    "pago_id": "PAG-0002",
+    "boleta": {
+      "numero": "B-000002",
+      "fecha": "2026-11-08T02:58:36+00:00",
+      "neto": 7555,
+      "iva": 1435,
+      "total": 8990
+    }
+  }
+}
