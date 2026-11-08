@@ -10,6 +10,8 @@ const ESTADOS = {
     PAGADO: "Pagado",
     EN_PREPARACION: "En preparación",
     DESPACHADO: "Despachado",
+    EN_DESPACHO: "En despacho",
+    ENTREGADO: "Entregado",
     ANULADO: "Anulado"
 };
 

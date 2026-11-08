@@ -4,7 +4,9 @@ Este archivo es identico en todos los servicios (gateway, auth, inventory...).
 Si se cambia en uno, se copia a los demas.
 """
 
+import asyncio
 import json
+import os
 import re
 import sys
 import time
@@ -17,6 +19,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 REQUEST_ID_HEADER = "X-Request-ID"
+# Falla controlada para pruebas (plan 2.5): demora artificial en cada solicitud
+FAULT_DELAY_MS = int(os.getenv("FAULT_DELAY_MS", "0"))
 _REQUEST_ID_VALIDO = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 
 CODIGOS = {
@@ -86,6 +90,8 @@ def instalar(app: FastAPI, service: str, confiar_identidad: bool):
         request.state.user_id = request.headers.get("X-Authenticated-User") if confiar_identidad else None
 
         inicio = time.perf_counter()
+        if FAULT_DELAY_MS > 0 and request.url.path != "/health":
+            await asyncio.sleep(FAULT_DELAY_MS / 1000)
         try:
             response = await call_next(request)
         except Exception as error:  # error no controlado: se registra el tipo, no el detalle

@@ -1,7 +1,17 @@
 // Página del carrito: muestra las líneas con cantidades, permite cambiarlas o
 // quitarlas, calcula el total y lleva al checkout.
 
-document.addEventListener("DOMContentLoaded", pintar);
+document.addEventListener("DOMContentLoaded", async () => {
+    const zona = document.getElementById("contenido-carrito");
+    mostrarEstado(zona, "cargando", "Cargando tu carrito…");
+    const resultado = await catalogoListo;
+    if (!resultado.ok) {
+        // Sin catálogo no hay precios vigentes: mejor no mostrar totales que pueden estar mal
+        mostrarError(zona, resultado);
+        return;
+    }
+    pintar();
+});
 
 function pintar() {
     const zona = document.getElementById("contenido-carrito");
@@ -82,7 +92,7 @@ function pintar() {
 
     const total = document.createElement("p");
     total.className = "carrito-total";
-    total.textContent = "Total: " + formatearPrecio(totalCarrito());
+    total.textContent = "Total estimado: " + formatearPrecio(totalCarrito()) + " (el servidor lo confirma al crear el pedido)";
 
     const acciones = document.createElement("div");
     acciones.className = "carrito-acciones";

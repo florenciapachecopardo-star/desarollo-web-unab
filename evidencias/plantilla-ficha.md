@@ -1,19 +1,23 @@
-# Ficha de evidencia [ID]
+# Ficha de evidencia [E??]: [nombre corto]
 
 | Campo | Valor |
 |---|---|
-| ID | P01 / C01 / E01 |
+| ID | E?? (prueba que ejecuta: P?? o C??) |
 | Nombre de la prueba | |
 | Módulo | M? |
-| Requisito relacionado | RF? |
+| Requisito relacionado | R?? |
 | Servicio y ruta | S?? `VERBO /api/v1/...` |
 | Rol que ejecuta | Anónimo / CLIENTE / ADMIN / DUENO / CAJERO / DESPACHO |
-| Fecha | |
+| Fecha y hora | DD-MM-AAAA, HH:MM (America/Santiago) |
 | Ejecutada por | |
+| Código | Commit o tag |
+| Entorno | Sistema operativo y forma de levantar el stack |
+| Estado | Aprobada / Fallida / Bloqueada / No ejecutada (con motivo) |
 
 ## Precondiciones
 
-- Se ejecutó `reset.sh` y `seed.py`.
+- Stack arriba con `docker compose up -d`.
+- Base en el estado inicial con `scripts/reset.sh` (carga el seed).
 -
 
 ## Pasos
@@ -29,15 +33,24 @@
 
 ## Resultado obtenido
 
+Se escribe antes de interpretar.
+
 - Código HTTP:
 - Respuesta:
 - `X-Request-ID`:
 
 ## Evidencia
 
-- Captura: `evidencias/u2/[nombre-archivo].png`
-- Línea del log con el mismo `X-Request-ID`:
+| Archivo | Qué muestra |
+|---|---|
+| `evidencias/u2/[carpeta]/[archivo]` | |
+
+**Vinculación:** el `request_id` (o el ID del pedido o pago) que une los archivos.
+
+## Límites de interpretación
+
+-
 
 ## Conclusión
 
-Aprobada / Rechazada. Si es rechazada, indicar la incidencia: INC??
+Aprobada / Fallida / Bloqueada / No ejecutada. Si falla, indicar la incidencia: INC??

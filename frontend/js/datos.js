@@ -1,12 +1,14 @@
 // Capa de datos de Chocomanía.
-// No hay servidor: todo se guarda en localStorage y se conserva al recargar.
-// La primera vez que se abre el sitio se cargan los datos de ejemplo.
+// Desde el PR G, el catálogo, el login, los pedidos y los pagos vienen del servidor (js/api.js).
+// Aquí queda: la caché de lectura del catálogo y los datos locales de las pantallas que
+// todavía no están conectadas (registro de clientes y panel interno, declaradas como recorte).
 
 const CLAVE_PRODUCTOS = "choco:productos";
 const CLAVE_CLIENTES = "choco:clientes";
 const CLAVE_USUARIOS = "choco:usuarios";
 const CLAVE_PEDIDOS = "choco:pedidos";
 const CLAVE_SEMILLA = "choco:semilla";
+const CLAVE_CATALOGO = "choco:catalogo"; // caché del catálogo que trae js/api.js desde el servidor
 
 const CATEGORIAS = [
     { id: "barras", nombre: "Barras" },
@@ -91,8 +93,9 @@ function restaurarDatosDeEjemplo() {
 }
 
 // --- Productos ---
+// Lee la caché del catálogo del servidor (los IDs son los de MongoDB, texto).
 function obtenerProductos() {
-    return leer(CLAVE_PRODUCTOS, []);
+    return leer(CLAVE_CATALOGO, []);
 }
 
 function guardarProductos(productos) {
@@ -100,7 +103,7 @@ function guardarProductos(productos) {
 }
 
 function buscarProducto(id) {
-    return obtenerProductos().find((producto) => producto.id === Number(id));
+    return obtenerProductos().find((producto) => String(producto.id) === String(id));
 }
 
 function nombreCategoria(id) {

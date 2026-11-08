@@ -1,24 +1,31 @@
-// Checkout: exige sesión de cliente. Muestra el resumen, deja elegir entrega
-// (despacho solo si la comuna está en el radio de 3 km) y medio de pago, y
-// crea el pedido antes de ir a la pantalla de pago.
+// Checkout: exige sesión de cliente. Muestra el resumen, pide la entrega y crea
+// el pedido en el servidor (S11). El precio y el total los calcula el servidor.
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const sesion = exigirCliente();
     if (!sesion) return;
 
+    const resumen = document.getElementById("resumen");
+    mostrarEstado(resumen, "cargando", "Cargando tu pedido…");
+    const catalogo = await catalogoListo;
+    if (!catalogo.ok) {
+        mostrarError(resumen, catalogo);
+        document.getElementById("form-checkout").hidden = true;
+        return;
+    }
+    resumen.textContent = "";
+
     // Carrito vacío: no hay nada que pagar.
-    if (detalleCarrito().length === 0) {
+    const detalle = detalleCarrito();
+    if (detalle.length === 0) {
         window.location.href = "carrito.html";
         return;
     }
 
-    const cliente = obtenerClientes().find((cli) => cli.id === sesion.id);
-
-    // Resumen de productos y total.
-    const resumen = document.getElementById("resumen");
+    // Resumen de productos y total estimado (el definitivo lo devuelve el servidor).
     const lista = document.createElement("ul");
     lista.className = "resumen-compra__lista";
-    detalleCarrito().forEach((item) => {
+    detalle.forEach((item) => {
         const li = document.createElement("li");
         li.textContent = item.cantidad + " × " + item.nombre;
         const precio = document.createElement("span");
@@ -28,59 +35,91 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     const total = document.createElement("p");
     total.className = "resumen-compra__total";
-    total.textContent = "Total: " + formatearPrecio(totalCarrito());
+    total.textContent = "Total estimado: " + formatearPrecio(totalCarrito());
     resumen.append(lista, total);
 
-    // Opciones de entrega según la cobertura de la comuna del cliente.
+    // Entrega: despacho (con dirección y comuna) o retiro en el local.
+    // El perfil del cliente no está conectado en la U2, por eso la dirección se pide aquí.
     const zonaEntrega = document.getElementById("opciones-entrega");
     const nota = document.getElementById("nota-despacho");
-    const cubierta = tieneDespacho(cliente.comuna);
+    zonaEntrega.innerHTML = `
+        <label class="opcion"><input type="radio" name="entrega" value="delivery" checked>
+            <span>Despacho a domicilio</span></label>
+        <div id="datos-despacho" class="grupo__campos">
+            <label for="direccion">Dirección</label>
+            <input id="direccion" type="text" maxlength="120" autocomplete="street-address">
+            <label for="comuna">Comuna</label>
+            <select id="comuna"></select>
+        </div>
+        <label class="opcion"><input type="radio" name="entrega" value="retiro">
+            <span>Retiro en el local</span></label>`;
+    nota.textContent = "El despacho es gratis dentro de 3 km del local (" + COMUNAS_CON_DESPACHO.join(", ") + ").";
 
-    const delivery = document.createElement("label");
-    delivery.className = "opcion";
-    delivery.innerHTML = `<input type="radio" name="entrega" value="delivery">
-        <span>Despacho a domicilio — ${cliente.comuna}</span>`;
-    const inputDelivery = delivery.querySelector("input");
+    const selectComuna = document.getElementById("comuna");
+    COMUNAS_CON_DESPACHO.forEach((comuna) => {
+        const opcion = document.createElement("option");
+        opcion.value = comuna;
+        opcion.textContent = comuna;
+        selectComuna.appendChild(opcion);
+    });
+    const datosDespacho = document.getElementById("datos-despacho");
+    zonaEntrega.querySelectorAll("input[name=entrega]").forEach((radio) => {
+        radio.addEventListener("change", () => {
+            datosDespacho.hidden = radio.value === "retiro" && radio.checked;
+        });
+    });
 
-    const retiro = document.createElement("label");
-    retiro.className = "opcion";
-    retiro.innerHTML = `<input type="radio" name="entrega" value="retiro">
-        <span>Retiro en el local</span>`;
-
-    if (cubierta) {
-        inputDelivery.checked = true;
-        nota.textContent = "El despacho es gratis dentro de 3 km del local.";
-    } else {
-        inputDelivery.disabled = true;
-        retiro.querySelector("input").checked = true;
-        nota.textContent = "Tu comuna (" + cliente.comuna + ") está fuera del radio de despacho de 3 km. Solo puedes retirar en el local.";
+    // El depósito necesita el panel del cajero, que no está en la U2.
+    const deposito = document.querySelector("input[name=pago][value=deposito]");
+    if (deposito) {
+        deposito.disabled = true;
+        deposito.closest("label").title = "No disponible en esta versión";
     }
 
-    zonaEntrega.append(delivery, retiro);
-
-    // Enviar: crea el pedido y va al pago.
     const form = document.getElementById("form-checkout");
     const error = document.getElementById("error");
+    const boton = form.querySelector("button[type=submit]");
 
-    form.addEventListener("submit", (evento) => {
+    form.addEventListener("submit", async (evento) => {
         evento.preventDefault();
         error.textContent = "";
 
         const entrega = form.entrega.value;
-        const medioPago = form.pago.value;
+        let despacho;
+        if (entrega === "delivery") {
+            const direccion = document.getElementById("direccion").value.trim();
+            if (direccion.length < 3) {
+                error.textContent = "Escribe la dirección de despacho.";
+                return;
+            }
+            despacho = { direccion, comuna: selectComuna.value };
+        } else {
+            despacho = { direccion: "Retiro en el local", comuna: "Providencia" };
+        }
 
-        if (!entrega) {
-            error.textContent = "Elige cómo quieres recibir el pedido.";
+        const cuerpo = {
+            lineas: detalleCarrito().map((item) => ({ producto_id: String(item.id), cantidad: item.cantidad })),
+            despacho
+        };
+
+        // La misma clave mientras no se cree el pedido: un doble clic o un reintento no duplica.
+        const nombreClave = "pedido:" + JSON.stringify(cuerpo);
+
+        boton.disabled = true;
+        boton.textContent = "Creando pedido…";
+        const resultado = await apiFetch("/api/v1/pedidos", {
+            method: "POST", body: cuerpo, idempotencyKey: claveIdempotencia(nombreClave)
+        });
+        boton.disabled = false;
+        boton.textContent = "Continuar al pago";
+
+        if (!resultado.ok) {
+            if (manejarSesionExpirada(resultado)) return;
+            escribirError(error, resultado);
             return;
         }
 
-        const pedido = crearPedido({
-            clienteId: cliente.id,
-            entrega,
-            comuna: cliente.comuna,
-            medioPago
-        });
-
-        window.location.href = "pago.html?numero=" + pedido.numero;
+        olvidarClaveIdempotencia(nombreClave);
+        window.location.href = "pago.html?numero=" + encodeURIComponent(resultado.data.id);
     });
 });
