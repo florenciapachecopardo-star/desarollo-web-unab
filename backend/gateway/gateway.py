@@ -16,6 +16,9 @@ VAULT_ADDR = os.getenv("VAULT_ADDR", "http://vault:8200")
 VAULT_TOKEN = os.getenv("VAULT_TOKEN")
 AUTH_URL = os.getenv("AUTH_URL", "http://auth:8000")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
+ORDERS_URL = os.getenv("ORDERS_URL", "http://orders:8000")
+PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments:8000")
+GRAPHQL_URL = os.getenv("GRAPHQL_URL", "http://graphql-gateway:8000")
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
 VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
@@ -50,6 +53,9 @@ class ServiceTarget:
 
 SERVICIOS = {
     "inventory": ServiceTarget(INVENTORY_URL, "backend_shared_secret"),
+    "orders": ServiceTarget(ORDERS_URL, "orders_shared_secret"),
+    "payments": ServiceTarget(PAYMENTS_URL, "payments_shared_secret"),
+    "graphql": ServiceTarget(GRAPHQL_URL, "graphql_shared_secret"),
 }
 
 RUTAS = [
@@ -58,6 +64,18 @@ RUTAS = [
     RouteDefinition("S03", "POST", "/api/v1/productos", "rol", ("ADMIN",), "inventory", "/productos"),
     RouteDefinition("S04", "PUT", "/api/v1/productos/{id}", "rol", ("ADMIN",), "inventory", "/productos/{id}"),
     RouteDefinition("S05", "DELETE", "/api/v1/productos/{id}", "rol", ("ADMIN",), "inventory", "/productos/{id}"),
+    # orders: la regla de propiedad (cliente solo ve lo suyo) la revisa orders
+    RouteDefinition("S11", "POST", "/api/v1/pedidos", "rol", ("CLIENTE",), "orders", "/pedidos"),
+    RouteDefinition("S12", "GET", "/api/v1/pedidos/{id}", "autenticado", (), "orders", "/pedidos/{id}"),
+    RouteDefinition("S13", "POST", "/api/v1/pedidos/{id}/anular", "autenticado", (), "orders", "/pedidos/{id}/anular"),
+    RouteDefinition("S14", "GET", "/api/v1/pedidos", "rol", ("DESPACHO", "ADMIN"), "orders", "/pedidos"),
+    RouteDefinition("S15", "PATCH", "/api/v1/pedidos/{id}/estado", "rol", ("DESPACHO", "ADMIN"), "orders", "/pedidos/{id}/estado"),
+    RouteDefinition("S19", "GET", "/api/v1/reportes/ventas", "rol", ("DUENO", "ADMIN"), "orders", "/reportes/ventas"),
+    # payments: S17 no lleva sesion; payments verifica el secreto propio del proveedor
+    RouteDefinition("S16", "POST", "/api/v1/pagos", "rol", ("CLIENTE",), "payments", "/pagos"),
+    RouteDefinition("S17", "POST", "/api/v1/pagos/aviso", "anonimo", (), "payments", "/pagos/aviso"),
+    # GraphQL Gateway privado: solo con sesion; la autorizacion por recurso y campo la hace graphql-gateway
+    RouteDefinition("S18", "POST", "/api/v1/graphql", "autenticado", (), "graphql", "/graphql"),
 ]
 
 _PARAM_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -155,8 +173,9 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
     if identidad:
         headers["X-Authenticated-User"] = identidad["user_id"]
         headers["X-Authenticated-Roles"] = ",".join(identidad["roles"])
-    if request.headers.get("content-type"):
-        headers["content-type"] = request.headers["content-type"]
+    for nombre in ("content-type", "idempotency-key", "x-proveedor-secret"):
+        if request.headers.get(nombre):
+            headers[nombre] = request.headers[nombre]
 
     try:
         async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
