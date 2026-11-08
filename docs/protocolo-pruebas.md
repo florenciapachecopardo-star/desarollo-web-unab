@@ -12,8 +12,8 @@ Definir cómo se ejecutan y registran las pruebas del backend de Chocomanía, pa
 | Reinicio de datos | `scripts/reset.sh`: borra usuarios, sesiones y productos y vuelve a cargar el seed. Necesita el stack arriba |
 | Datos iniciales | `scripts/seed.py`: 6 usuarios (uno por rol del front, dos clientes) y 5 productos con ID fijos, todos ficticios. Corre dentro de Docker (`docker compose run --rm seed`); `reset.sh` lo ejecuta con `--reset` |
 | Logs de una solicitud | `scripts/logs.sh <request_id>` |
-| Verificación en la base | `scripts/check.py` (pendiente, llega con el PR D) |
-| Pruebas automáticas | `pytest` en `tests/api` (pendiente, llega con el PR H) |
+| Verificación en la base | `docker compose run --rm check pedido PED-0001` (también `producto`, `usuario` y `pago`). No muestra hashes de claves ni sesiones |
+| Pruebas automáticas | `pytest` en `tests/api` (pendiente de ejecución) |
 
 ## 3. Reglas
 
@@ -37,7 +37,7 @@ Los requisitos (R), servicios (S) y flujos (F) están en `docs/m1-servicios.md`.
 
 | ID | Qué se prueba | Resultado esperado | Resultado obtenido | Evidencia |
 |---|---|---|---|---|
-| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | | |
+| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | 200 sin sesión | E01 |
 | P02 | Operación protegida sin sesión (S11) | 401 | | |
 | P03 | CLIENTE intenta una operación de ADMIN (S03) | 403 | | |
 | P04 | CLIENTE consulta un pedido ajeno (S12) | 404 sin datos del pedido | | |

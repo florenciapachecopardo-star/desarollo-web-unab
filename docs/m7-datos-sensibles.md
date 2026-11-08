@@ -1,6 +1,8 @@
-# M7. Datos sensibles (borrador)
+# M7. Datos sensibles
 
-**Estado:** borrador. La versión final se completa con los resultados de las 6 pruebas de seguridad (PR H) y se revisa contra el código de auth, clients, orders y payments.
+**Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Solo faltan los resultados de las 6 pruebas de seguridad (sección 7), que llegan con las pruebas automáticas de Flo.
+
+**Cambio respecto del borrador:** el servicio clients no se implementó (S09 y S10). Por eso RUN, fecha de nacimiento y sexo **no llegan al backend**, y la dirección y el teléfono solo existen como copia de despacho dentro del pedido. La columna "Estado en la U2" dice qué está construido y qué es diseño.
 
 ## 1. Niveles de clasificación
 
@@ -14,58 +16,69 @@
 
 ## 2. Matriz de datos
 
-| Dato | Finalidad | Clasificación | Custodio | Roles que acceden | Cómo se ve en el front | Protección | Retención |
+| Dato | Finalidad | Clasificación | Custodio | Roles que acceden | Protección | Retención | Estado en la U2 |
 |---|---|---|---|---|---|---|---|
-| RUN | Identificar al cliente (Caso 19, RF5) y emitir la boleta | Restringido | clients | CLIENTE (el suyo), ADMIN | Enmascarado: `**.***.678-5` | Único en la base, validado con dígito verificador, nunca en logs | Mientras la cuenta esté activa |
-| Nombre completo | Despacho y boleta | Personal | clients | CLIENTE (el suyo), ADMIN, DESPACHO (solo en la cola) | Completo solo para su dueño | Nunca en logs | Mientras la cuenta esté activa |
-| Correo | Inicio de sesión, contacto y envío de boleta | Personal | auth y clients | CLIENTE (el suyo), ADMIN | Completo solo para su dueño | Único, nunca en logs (los logs usan el ID del usuario) | Mientras la cuenta esté activa |
-| Dirección, comuna, provincia, región | Despacho dentro del radio de 3 km | Personal | clients (perfil) y orders (copia en el pedido) | CLIENTE (la suya), DESPACHO (solo pedidos pagados), ADMIN | Completa solo para su dueño y en la cola de despacho | Nunca en logs ni en el reporte de ventas | Perfil: mientras la cuenta esté activa. Pedido: igual que el pedido |
-| Teléfono | Contacto para el despacho | Personal | clients | CLIENTE (el suyo), DESPACHO, ADMIN | Completo solo para su dueño y en la cola de despacho | Nunca en logs | Mientras la cuenta esté activa |
-| Fecha de nacimiento | La pide el Caso 19 (RF5) | Restringido | clients | CLIENTE (la suya), ADMIN | Solo en el perfil propio | No se usa en ninguna otra pantalla ni servicio | Mientras la cuenta esté activa |
-| Sexo | Lo pide el Caso 19 (RF5) | Restringido | clients | CLIENTE (el suyo), ADMIN | Solo en el perfil propio | No se usa en ninguna otra pantalla ni servicio | Mientras la cuenta esté activa |
-| Contraseña | Autenticación (RF12) | Secreto | auth | Nadie | Nunca se muestra | Hash bcrypt con sal. Nunca en logs, respuestas ni capturas | Se reemplaza al cambiarla |
-| Sesión (cookie) | Mantener la sesión iniciada | Secreto | auth y gateway | El navegador del usuario | No se ve (cookie `httponly`) | `httponly`, expiración (TTL), invalidada al cerrar sesión | Hasta que expira o se cierra la sesión |
-| Pedidos y líneas | Compra, despacho y reporte | Personal | orders | CLIENTE (los suyos), DESPACHO (pagados), ADMIN, DUENO (solo totales en el reporte) | Solo para su dueño | Regla de propiedad revisada en orders, no solo en el gateway | Plazo tributario (a confirmar) |
-| Boleta | Comprobante de la venta (RF8) | Personal | orders | CLIENTE (las suyas), ADMIN | Solo para su dueño | Igual que el pedido | Plazo tributario (a confirmar) |
-| Pago (monto, estado, referencia del proveedor) | Confirmar el pago | Personal | payments | CLIENTE (el suyo), ADMIN | Solo el estado y el monto | Solo payments decide "pagado". El `Idempotency-Key` evita pagos dobles | Igual que el pedido |
-| Secretos entre servicios | Que solo el gateway pueda llamar a los servicios internos | Secreto | Vault | Solo los servicios autorizados | Nunca | Guardados en Vault, uno por integración, nunca en el repo, logs ni capturas | Se rotan si se filtran |
-| `request_id` | Unir pantalla, respuesta, log y base de datos | Interno | gateway (lo genera) | Todos | Se muestra en chico en los mensajes de error | No contiene datos personales | Igual que los logs |
+| RUN | Identificar al cliente (RF5) y emitir la boleta | Restringido | clients (diseño) | CLIENTE (el suyo), ADMIN | Enmascarado (`**.***.678-5`), único, validado con dígito verificador, nunca en logs | Mientras la cuenta esté activa | **No implementado en el backend.** El registro local del front lo guarda en localStorage (brecha) |
+| Nombre | Saludo, despacho y boleta | Personal | auth (usuarios) | El propio usuario | Se devuelve solo en S08 (`/me`) al dueño de la sesión; los logs usan el ID | Mientras la cuenta esté activa | Implementado. La cola de despacho no lo muestra: solo trae `cliente_id` |
+| Correo | Inicio de sesión y contacto | Personal | auth | El propio usuario | Único; nunca en logs; la respuesta del login es igual si el correo no existe o la clave es incorrecta | Mientras la cuenta esté activa | Implementado |
+| Dirección y comuna de despacho | Entregar el pedido | Personal | orders (copia dentro del pedido) | CLIENTE (la suya), DESPACHO (pedidos pagados), ADMIN | No aparece en logs ni en el reporte de ventas; DESPACHO no ve pedidos sin pagar | Igual que el pedido | Implementado en S11 (`despacho`) |
+| Teléfono de despacho | Contacto para la entrega | Personal | orders (copia dentro del pedido, opcional) | CLIENTE (el suyo), DESPACHO (pedidos pagados), ADMIN | No aparece en logs; GraphQL no lo expone (Despacho solo tiene dirección y comuna) | Igual que el pedido | Implementado |
+| Fecha de nacimiento y sexo | Los pide el Caso 19 (RF5) | Restringido | clients (diseño) | CLIENTE (los suyos), ADMIN | No se usan en ninguna pantalla ni servicio | Mientras la cuenta esté activa | **No implementado en el backend**; solo en el registro local (brecha) |
+| Contraseña | Autenticación (RF12) | Secreto | auth | Nadie | Hash bcrypt costo 12; nunca en logs, respuestas ni capturas (`check.py` no muestra el hash) | Se reemplaza al cambiarla | Implementado para las cuentas del seed. **El registro local guarda la clave en texto plano en localStorage** (brecha) |
+| Sesión (cookie) | Mantener la sesión | Secreto | auth (guarda solo el hash SHA-256 del token) y gateway (pone la cookie) | El navegador del usuario | Cookie `session_token` `httponly`, `samesite=lax`, TTL de 900 s con índice TTL en Mongo, invalidada en el logout | Hasta que expira o se cierra | Implementado. `secure` queda en `false` por defecto porque el entorno local usa HTTP |
+| Pedidos y líneas | Compra, despacho y reporte | Personal | orders | CLIENTE (los suyos), DESPACHO (pagados), ADMIN, DUENO (solo totales en S19) | Propiedad revisada en orders con la identidad del gateway; pedido ajeno = 404 | A confirmar (plazo tributario) | Implementado |
+| Boleta (número, neto, IVA, total) | Comprobante de la venta (RF8) | Personal | orders | Quien puede ver el pedido | Igual que el pedido; la numera el servidor | A confirmar (plazo tributario) | Implementada (R08 parcial: sin envío por correo) |
+| Pago (monto, estado, referencia) | Confirmar el pago | Personal | payments | CLIENTE (el suyo) | Monto tomado de orders, nunca del navegador; solo payments marca PAGADO; `Idempotency-Key` evita pagos dobles | Igual que el pedido | Implementado con proveedor simulado |
+| Secretos entre servicios | Que solo el servicio autorizado llame a cada operación | Secreto | Vault (los del gateway) y `.env` (los demás) | Solo el servicio de cada integración | Uno por integración; nunca en el repo, logs ni capturas; comparación de tiempo constante | Se rotan si se filtran | Implementado. Solo el gateway los lee de Vault (brecha, ver M6) |
+| `request_id` | Unir pantalla, respuesta, log y base | Interno | gateway (lo genera o valida) | Todos | Formato acotado (8 a 64 caracteres); no contiene datos personales | Igual que los logs | Implementado |
 
 ## 3. ¿Custodiamos secretos del cliente?
 
-**No.** Chocomanía no guarda datos de tarjetas ni de cuentas bancarias. El pago lo procesa un proveedor externo (en la U2, un adaptador de prueba que respeta el contrato). Payments solo guarda el monto, el estado y la referencia que devuelve el proveedor.
+**No.** Chocomanía no recibe ni guarda datos de tarjetas ni de cuentas bancarias: S16 solo recibe el `pedido_id`. El pago lo resuelve el proveedor (en la U2, un doble de prueba que respeta el contrato) y payments solo guarda el monto, el estado y la referencia que devuelve el proveedor (`SIM-...`).
 
-El único secreto del cliente que guardamos es su contraseña, y solo como hash bcrypt: ni el sistema ni el administrador pueden recuperarla.
+El único secreto del cliente que guarda el backend es su contraseña, y solo como hash bcrypt. La excepción es el registro local del front, que no pasa por el backend (ver brechas).
 
 ## 4. Minimización
 
-- La fecha de nacimiento y el sexo se piden porque el Caso 19 los exige (RF5), pero no se usan en ningún flujo. Se muestran solo en el perfil propio.
-- El reporte de ventas del dueño muestra totales por producto, sin nombres, correos ni direcciones de clientes.
-- La cola de despacho muestra solo lo necesario para entregar: nombre, dirección, teléfono y productos. No muestra RUN, correo ni montos.
-- Los logs identifican al usuario por su ID interno, nunca por correo ni RUN.
+- La fecha de nacimiento y el sexo se piden en el registro porque el Caso 19 los exige (RF5), pero ningún servicio los recibe ni los usa.
+- El reporte de ventas (S19) solo trae cantidades y montos por producto: sin nombres, correos ni direcciones.
+- La cola de despacho (S14) trae el `cliente_id`, la dirección, la comuna, el teléfono y las líneas del pedido; no trae RUN, correo ni nombre. Sí trae el total y la boleta, porque se devuelve el pedido completo (posible mejora: una vista reducida para DESPACHO).
+- GraphQL (S18) no expone el teléfono, y `stock` solo se entrega a ADMIN (`FORBIDDEN_FIELD` para el resto).
+- Los logs usan campos fijos: servicio, evento, `request_id`, método, ruta, estado, `user_id` y duración. Nunca correo, dirección, teléfono ni secretos. El gateway registra solo los nombres de las claves que lee de Vault.
 
-## 5. Recorrido de un dato restringido: la dirección
+## 5. Recorrido de un dato restringido: la dirección de despacho
 
-1. **Captura:** el cliente la escribe en el registro (S09). Viaja por HTTPS al gateway y de ahí a clients.
-2. **Almacenamiento:** clients la guarda en su colección. No queda en los logs del gateway ni de clients.
-3. **Uso en una compra:** al crear el pedido (S11), orders guarda una copia de la dirección de despacho, para que un cambio posterior en el perfil no altere un pedido ya hecho.
-4. **Consulta:** el cliente la ve en su perfil (S10) y en sus pedidos. DESPACHO la ve en la cola (S14) solo cuando el pedido está pagado.
-5. **Lo que no pasa:** no aparece en el reporte de ventas (S19), en los logs ni en las capturas de evidencia.
-6. **Fin:** si el cliente cierra su cuenta, se borra del perfil. La copia del pedido se conserva por el plazo tributario de la boleta.
+1. **Captura:** el cliente la escribe en el checkout (`checkout.html`). Viaja al gateway en el mismo origen (`http://localhost:8000`) y de ahí a orders dentro de S11.
+2. **Validación:** orders exige dirección de 3 a 120 caracteres y comuna de 2 a 60. Si falla, el 422 dice qué campo falló, sin repetir el valor.
+3. **Almacenamiento:** orders la guarda dentro del pedido (`despacho`). Es una copia: si el cliente cambia de dirección, el pedido no cambia.
+4. **Consulta:** la ven el dueño (S12 y S18, esta última sin teléfono), DESPACHO cuando el pedido está pagado (S14) y ADMIN.
+5. **Lo que no pasa:** no aparece en los logs (E02 y E03 muestran las líneas completas de una compra y un pago), en el reporte de ventas (S19) ni en la respuesta de GraphQL con teléfono.
+6. **Fin:** se conserva con el pedido por el plazo tributario de la boleta (a confirmar).
 
 ## 6. Verificación del correo
 
-El Caso 19 pide comprobar con una API de mensajería que el correo existe y está activo (RF5, RF11). En la U2 esta verificación es **simulada**: se genera un código y se muestra en pantalla, sin enviar un correo real. Se declara como brecha en el informe.
+El Caso 19 pide comprobar con una API de mensajería que el correo existe y está activo (RF5, RF11). En la U2 esta verificación es **simulada** en `verificar.html`: se genera un código y se muestra en pantalla, sin enviar un correo real. Se declara como brecha en el informe.
 
 ## 7. Pruebas de seguridad
 
-Detalle de cada una en `docs/protocolo-pruebas.md`. Resultados pendientes hasta el PR H.
+Detalle de cada una en `docs/protocolo-pruebas.md`. Los resultados se completan cuando Flo ejecute las pruebas automáticas. Donde ya hay una evidencia que cubre el caso, se indica.
 
 | ID | Caso | Resultado esperado | Resultado obtenido | Evidencia |
 |---|---|---|---|---|
-| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | | |
-| P02 | Operación protegida sin sesión (S11) | 401 | | |
-| P03 | CLIENTE intenta una operación de ADMIN (S03) | 403 | | |
-| P04 | CLIENTE consulta un pedido ajeno (S12) | 404 sin datos del pedido | | |
-| P05 | Llamada directa a un servicio interno sin pasar por el gateway | Rechazada | | |
-| P06 | El front manda un precio o estado de pago alterado (S11) | El servidor lo ignora y usa el precio de inventory | | |
+| P01 | Visitante anónimo consulta el catálogo (S01) | 200 con la lista de productos | 200 sin sesión | E01 |
+| P02 | Operación protegida sin sesión (S11) | 401 | Pendiente | |
+| P03 | CLIENTE intenta una operación de ADMIN (S03) | 403 | Pendiente | |
+| P04 | CLIENTE consulta un pedido ajeno (S12) | 404 sin datos del pedido | Pendiente | |
+| P05 | Llamada directa a un servicio interno sin pasar por el gateway | Rechazada | Pendiente | |
+| P06 | El front manda un precio o estado alterado (S11) | El servidor lo ignora y usa el precio de inventory | Pendiente. E02 muestra el precio tomado de inventory, pero sin el envío alterado | E02 (parcial) |
+
+## 8. Riesgos y brechas de datos
+
+| Riesgo | Situación | Tratamiento |
+|---|---|---|
+| Registro local con datos personales y clave en texto plano en localStorage | El registro (`registro.js`) y el login de cuentas locales (`cuentas.js`) no usan el backend | Brecha declarada; se resuelve con clients (S09 y S10) en la U3 |
+| Cuentas de prueba visibles en el login | `login.html` muestra correos y claves de prueba, incluida la de ADMIN | Son ficticias y solo para la demo; se quitan antes de cualquier despliegue real |
+| Mongo con el usuario raíz en todos los servicios | Un servicio comprometido podría leer las bases de los demás | Brecha declarada (M6); en la U3, un usuario por base con permisos mínimos |
+| Vault en modo dev y solo para el gateway | Los demás servicios reciben sus secretos por variables de entorno | Brecha declarada (M6) |
+| Cookie sin `secure` | El entorno local usa HTTP | Se activa con `COOKIE_SECURE=true` al usar HTTPS |
+| Cola de despacho con montos | S14 devuelve el pedido completo | Mejora para la U3 (vista reducida) |
