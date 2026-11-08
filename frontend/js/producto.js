@@ -1,5 +1,5 @@
 // Ficha de producto. Lee el id desde ?id= y muestra el producto desde el
-// catálogo. Los relacionados son los de la misma categoría.
+// catálogo del servidor. Los relacionados son los de la misma categoría.
 
 function obtenerProductoActual() {
     const parametro = new URLSearchParams(window.location.search).get("id");
@@ -76,7 +76,13 @@ function mostrarRelacionados(producto) {
     relacionados.forEach((otro) => grilla.appendChild(crearTarjeta(otro)));
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    const resultado = await catalogoListo;
+    if (!resultado.ok) {
+        mostrarError(document.getElementById("detalle"), resultado);
+        document.getElementById("relacionados").hidden = true;
+        return;
+    }
     const producto = obtenerProductoActual();
 
     if (producto) {

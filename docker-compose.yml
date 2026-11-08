@@ -195,6 +195,9 @@ services:
     image: chocomania-gateway:dev
     ports:
       - "8000:8000"
+    volumes:
+      # El front se monta en modo solo lectura: los cambios en frontend/ se ven al recargar
+      - ./frontend:/frontend:ro
     environment:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${GATEWAY_VAULT_TOKEN}
@@ -203,6 +206,7 @@ services:
       ORDERS_URL: http://orders:8000
       PAYMENTS_URL: http://payments:8000
       GRAPHQL_URL: http://graphql-gateway:8000
+      FRONTEND_DIR: /frontend
       UPSTREAM_TIMEOUT_SECONDS: ${UPSTREAM_TIMEOUT_SECONDS:-5}
     networks: [publica, privada]
     depends_on:

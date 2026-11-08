@@ -25,12 +25,10 @@ const NOMBRE_PERFIL = {
     DESPACHO: "Encargado de despacho"
 };
 
-// Página de inicio del panel según el perfil (a cada rol lo dejo donde trabaja).
+// Página de inicio según el perfil. El panel interno no está en la U2 (recorte declarado),
+// así que el personal vuelve al inicio.
 function inicioSegunPerfil(perfil) {
-    if (perfil === "CAJERO") return "admin-caja.html";
-    if (perfil === "DESPACHO") return "admin-despacho.html";
-    if (perfil === "DUENO") return "admin-reportes.html";
-    return "admin.html";
+    return "index.html";
 }
 
 // Dibuja el enlace de cuenta en la cabecera de cualquier página.
@@ -51,21 +49,24 @@ function pintarCuentaCabecera() {
         return;
     }
 
-    const enlace = document.createElement("a");
+    const enlace = document.createElement(sesion.tipo === "CLIENTE" ? "a" : "span");
     if (sesion.tipo === "CLIENTE") {
         enlace.href = "mis-pedidos.html";
         enlace.textContent = sesion.nombre.split(" ")[0];
     } else {
-        enlace.href = inicioSegunPerfil(sesion.perfil);
-        enlace.textContent = "Panel";
+        enlace.textContent = (NOMBRE_PERFIL[sesion.perfil] || sesion.perfil);
     }
 
     const salir = document.createElement("button");
     salir.type = "button";
     salir.className = "cuenta__salir";
     salir.textContent = "Salir";
-    salir.addEventListener("click", () => {
-        cerrarSesion();
+    salir.addEventListener("click", async () => {
+        if (typeof cerrarSesionApi === "function") {
+            await cerrarSesionApi();
+        } else {
+            cerrarSesion();
+        }
         window.location.href = "index.html";
     });
 
@@ -91,7 +92,8 @@ function exigirPerfil(perfilesPermitidos) {
 function exigirCliente() {
     const sesion = sesionActual();
     if (!sesion || sesion.tipo !== "CLIENTE") {
-        window.location.href = "login.html";
+        const volver = encodeURIComponent(window.location.pathname.replace(/^\//, "") + window.location.search);
+        window.location.href = "login.html?volver=" + volver;
         return null;
     }
     return sesion;
