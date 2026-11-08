@@ -2,7 +2,7 @@
 
 Diagrama de clases: `docs/uml-gateway.drawio` (se abre en app.diagrams.net).
 
-**Fuente:** `backend/gateway/gateway.py`, `backend/gateway/observabilidad.py` y `docker-compose.yml` en la rama `feat/payments` (commit `7537e34`, que incluye el PR D). Las rutas de orders y payments se confirman cuando se mergeen los PR D y E. El GraphQL Gateway (S18) llega con el PR F.
+**Fuente:** `backend/gateway/gateway.py`, `backend/gateway/observabilidad.py`, `backend/graphql-gateway/main.py` y `docker-compose.yml` en `main` (commit `5ee71b8`). El detalle de GraphQL está en `docs/m8-graphql.md`.
 
 ## 1. Un solo gateway
 
@@ -12,20 +12,22 @@ Chocomanía usa **un único API Gateway**. Se eligió uno solo porque:
 - La carga proyectada es baja (menos de 25 solicitudes por segundo en el peak, ver `docs/m9-carga.md`).
 - Un solo lugar concentra la lista blanca, la validación de sesión, el `X-Request-ID` y la lectura de secretos, así que es más fácil de revisar y probar.
 
-El GraphQL Gateway (PR F) no es un segundo punto de entrada: es privado y solo se llega a él a través del API Gateway.
+El GraphQL Gateway no es un segundo punto de entrada: es privado (sin puerto publicado) y solo se llega a él a través del API Gateway, por S18. El API Gateway también sirve los archivos del front en el mismo origen (`http://localhost:8000`), así que el navegador no necesita CORS.
 
 ## 2. Clases del diagrama
 
 | Clase | Qué representa | Dónde está en el código |
 |---|---|---|
-| ApiGateway | La aplicación FastAPI del gateway: registra las rutas de la lista blanca y las reenvía | `gateway.py` (`app`, `registrar`, `reenviar`, `login`, `logout`, `me`) |
+| ApiGateway | La aplicación FastAPI del gateway: registra las rutas de la lista blanca, las reenvía y sirve el front estático | `gateway.py` (`app`, `registrar`, `reenviar`, `login`, `logout`, `me` y el montaje de `FRONTEND_DIR`) |
 | RouteDefinition | Una ruta permitida: ID del M1, verbo, ruta externa, tipo de acceso, roles, destino y ruta interna | `gateway.py` (`@dataclass RouteDefinition`, lista `RUTAS`) |
 | ServiceTarget | Un servicio destino: URL interna y nombre de su secreto en Vault | `gateway.py` (`@dataclass ServiceTarget`, diccionario `SERVICIOS`) |
 | AuthenticationPolicy | Valida la cookie `session_token` con auth (`/introspect`) y arma la identidad | `gateway.py` (funciones `obtener_identidad` y `llamar_auth`) |
 | AuthorizationPolicy | Decide si la identidad cumple el acceso de la ruta: anónimo, autenticado o rol | `gateway.py` (handler dentro de `registrar`) |
 | SecretProvider | Lee los secretos de `secret/gateway` en Vault con un token de solo lectura, con caché de 60 s | `gateway.py` (función `secretos`) |
 | Observabilidad | Middleware de `X-Request-ID`, logs JSON y formato único de error | `observabilidad.py` (`instalar`, `log`, `respuesta_error`) |
-| GraphQLGateway, Schema, Resolver | Gateway GraphQL privado con la query `misPedidos` | Pendiente: PR F |
+| GraphQLGateway | Servicio privado que exige su secreto, arma el contexto con la identidad y aplica los límites | `graphql-gateway/main.py` (`app`, `contexto`, `GraphQLRouter`) |
+| Schema | Queries `misPedidos` y `pedido`, tipos y límites de profundidad (6), alias (10) y tokens (1000) | `graphql-gateway/main.py` (`Query`, `SchemaConLogs`) |
+| Resolver | Resuelve cada campo; `Linea.producto` usa un DataLoader para pedir todos los productos en una sola llamada | `graphql-gateway/main.py` (`mis_pedidos`, `pedido`, `Linea.producto`, `cargador_productos`) |
 
 En el código, AuthenticationPolicy, AuthorizationPolicy y SecretProvider son **funciones**, no clases. En el diagrama se muestran como clases para separar sus responsabilidades.
 
@@ -35,10 +37,11 @@ En el código, AuthenticationPolicy, AuthorizationPolicy y SecretProvider son **
 |---|---|---|
 | Anónimas | S01, S02 (catálogo), S06 (login), S07 (logout, con o sin sesión) | Nada. Igual pasan por la lista blanca, la validación de parámetros y el `X-Request-ID` |
 | Externa con secreto propio | S17 (aviso del proveedor de pagos) | Nada en el gateway; payments exige `X-Proveedor-Secret` |
-| Autenticadas | S08, S12, S13 | Sesión vigente. La propiedad del pedido la revisa orders |
+| Autenticadas | S08, S12, S13, S18 | Sesión vigente. La propiedad del pedido la revisa orders; en S18, el rol y el campo los revisa graphql-gateway |
 | Por rol | S03 a S05 (ADMIN), S11 y S16 (CLIENTE), S14 y S15 (DESPACHO o ADMIN), S19 (DUENO o ADMIN) | Sesión vigente y rol permitido. El servicio vuelve a revisar el rol |
-| Internas (no expuestas) | `/interno/*` de inventory y orders, `/introspect` y `/logout` de auth, `/health` de cada servicio | No están en la lista blanca: desde fuera responden 404 |
-| Pendientes | S09, S10 (clients) y S18 (GraphQL) | Se agregan cuando existan esos servicios |
+| Front estático | `GET /`, `/*.html`, `/js/*`, `/css/*`, `/img/*` | Nada: son archivos públicos. Solo se sirven archivos de la carpeta `frontend/` |
+| Internas (no expuestas) | `/interno/*` de inventory y orders, `/introspect` y `/logout` de auth, `/graphql` de graphql-gateway, `/health` de cada servicio | No están en la lista blanca: desde fuera responden 404 |
+| No implementadas | S09, S10 (clients) | Recorte declarado: el registro y el perfil quedan en el front |
 
 ## 4. Fronteras de confianza
 
@@ -56,6 +59,7 @@ flowchart LR
         INV["inventory"]
         ORD["orders"]
         PAY["payments"]
+        GQL["graphql-gateway"]
         VAULT["Vault"]
         MONGO["MongoDB"]
     end
@@ -65,6 +69,9 @@ flowchart LR
     GW -- "backend_shared_secret" --> INV
     GW -- "orders_shared_secret" --> ORD
     GW -- "payments_shared_secret" --> PAY
+    GW -- "graphql_shared_secret" --> GQL
+    GQL -- "GRAPHQL_ORDERS_SECRET (lectura)" --> ORD
+    GQL -- "GRAPHQL_INVENTORY_SECRET (lectura)" --> INV
     GW -- "token de solo lectura" --> VAULT
     ORD -- "ORDERS_INVENTORY_SECRET" --> INV
     PAY -- "PAYMENTS_ORDERS_SECRET" --> ORD
@@ -79,7 +86,7 @@ flowchart LR
 | 1. Navegador → gateway | Nada de lo que manda el navegador | Lista blanca de rutas y verbos; parámetros validados (`^[A-Za-z0-9_-]{1,64}$`); sesión validada con auth en cada solicitud; los `X-Authenticated-*` del navegador se descartan; `X-Request-ID` se acepta solo si es válido; solo se reenvían `content-type`, `idempotency-key` y `x-proveedor-secret` |
 | 2. Proveedor → gateway → payments | El aviso de pago | payments revisa `X-Proveedor-Secret` y procesa cada aviso una sola vez |
 | 3. Gateway → servicios internos | Que alguien llame a un servicio sin pasar por el gateway | Red privada sin acceso desde fuera; cada servicio exige su propio `X-Gateway-Secret`; solo con ese secreto confía en `X-Authenticated-User` y `X-Authenticated-Roles` |
-| 4. Servicio → servicio | Que un servicio use una operación que no le corresponde | Secretos distintos por integración: orders → inventory y payments → orders |
+| 4. Servicio → servicio | Que un servicio use una operación que no le corresponde | Secretos distintos por integración: orders → inventory, payments → orders y graphql-gateway → orders e inventory. Los de graphql-gateway solo sirven para leer |
 | 5. Gateway → Vault | Que el gateway lea más de lo que necesita | Token con política de solo lectura sobre `secret/gateway` |
 | 6. Servicios → MongoDB | — | Cada servicio usa su propia base, pero todos con el usuario raíz (brecha declarada en el M6) |
 
