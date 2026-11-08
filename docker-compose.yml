@@ -158,6 +158,8 @@ services:
       # Proveedor simulado (doble de prueba): inmediato | aviso, y APROBADO | RECHAZADO
       SIMULADOR_MODO: ${SIMULADOR_MODO:-inmediato}
       SIMULADOR_RESULTADO: ${SIMULADOR_RESULTADO:-APROBADO}
+      # Reintento de pagos aprobados que orders no alcanzo a registrar
+      RECONCILIAR_CADA_SEGUNDOS: ${RECONCILIAR_CADA_SEGUNDOS:-15}
     networks: [privada]
     depends_on:
       mongo:

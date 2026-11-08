@@ -1,3 +1,4 @@
+import asyncio
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -35,6 +36,8 @@ UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "3"))
 #   aviso     -> el pago queda PENDIENTE hasta que llega S17 (POST /pagos/aviso)
 SIMULADOR_MODO = os.getenv("SIMULADOR_MODO", "inmediato")
 SIMULADOR_RESULTADO = os.getenv("SIMULADOR_RESULTADO", "APROBADO")
+# Cada cuantos segundos se reintenta avisar a orders los pagos aprobados que no alcanzaron a llegar
+RECONCILIAR_CADA_SEGUNDOS = float(os.getenv("RECONCILIAR_CADA_SEGUNDOS", "15"))
 
 cliente_mongo = AsyncIOMotorClient(MONGO_URL)
 db = cliente_mongo[MONGO_DB]
@@ -46,8 +49,11 @@ contadores = db["contadores"]
 async def lifespan(app: FastAPI):
     await pagos.create_index([("cliente_id", 1), ("idempotency_key", 1)], unique=True)
     await pagos.create_index("pedido_id")
+    await pagos.create_index([("estado", 1), ("pedido_sincronizado", 1)])
     log(SERVICE, level="info", event="startup", simulador_modo=SIMULADOR_MODO)
+    tarea = asyncio.create_task(reconciliar_periodicamente())
     yield
+    tarea.cancel()
 
 
 app = FastAPI(title="Chocomania payments", lifespan=lifespan)
@@ -103,8 +109,8 @@ def leer_idempotency_key(idempotency_key: str = Header(default="")) -> str:
 # Integracion con orders
 # ---------------------------------------------------------------------------
 
-async def llamar_orders(request: Request, metodo: str, ruta: str, body: dict | None = None) -> httpx.Response:
-    headers = {"X-Service-Secret": PAYMENTS_ORDERS_SECRET, REQUEST_ID_HEADER: request_id_de(request)}
+async def llamar_orders(request_id: str, metodo: str, ruta: str, body: dict | None = None) -> httpx.Response:
+    headers = {"X-Service-Secret": PAYMENTS_ORDERS_SECRET, REQUEST_ID_HEADER: request_id}
     try:
         async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
             return await client.request(metodo, f"{ORDERS_URL}{ruta}", json=body, headers=headers)
@@ -149,6 +155,9 @@ def salida(pago: dict) -> dict:
         "creado_en": pago["creado_en"].replace(tzinfo=timezone.utc).isoformat(timespec="seconds")
         if pago["creado_en"].tzinfo is None else pago["creado_en"].isoformat(timespec="seconds"),
     }
+    if pago["estado"] == EstadoPago.APROBADO.value:
+        # False = el pago esta aprobado pero orders todavia no lo registra (se reintenta solo)
+        datos["pedido_sincronizado"] = pago.get("pedido_sincronizado", False)
     if pago.get("boleta"):
         datos["boleta"] = pago["boleta"]
     return datos
@@ -161,40 +170,76 @@ async def siguiente_id() -> str:
     return f"PAG-{contador['seq']:04d}"
 
 
+async def sincronizar_pedido(request_id: str, pago: dict) -> dict:
+    """Le avisa a orders que el pedido esta pagado. Si orders no responde, el pago queda
+    con pedido_sincronizado=False y se reintenta despues (reconciliacion)."""
+    try:
+        resp = await llamar_orders(request_id, "POST", f"/interno/pedidos/{pago['pedido_id']}/pagado",
+                                   {"pago_id": pago["_id"]})
+    except ApiError as error:
+        log(SERVICE, level="warning", event="order_sync_pending", request_id=request_id,
+            pago_id=pago["_id"], pedido_id=pago["pedido_id"], motivo=error.code)
+        return pago
+
+    if resp.status_code == 200:
+        boleta = resp.json().get("boleta")
+        cambios = {"pedido_sincronizado": True, "boleta": boleta}
+    elif resp.status_code == 409:
+        # El pedido ya estaba pagado con otro pago: este se revierte (con el simulador no hay cobro real)
+        cambios = {"pedido_sincronizado": True, "estado": EstadoPago.REVERTIDO.value}
+    else:
+        log(SERVICE, level="warning", event="order_sync_pending", request_id=request_id,
+            pago_id=pago["_id"], pedido_id=pago["pedido_id"], orders_status=resp.status_code)
+        return pago
+
+    actualizado = await pagos.find_one_and_update({"_id": pago["_id"]}, {"$set": cambios},
+                                                  return_document=ReturnDocument.AFTER)
+    log(SERVICE, level="info", event="order_synced", request_id=request_id,
+        pago_id=pago["_id"], pedido_id=pago["pedido_id"], estado=actualizado["estado"])
+    return actualizado
+
+
+async def reconciliar_periodicamente():
+    """Reintenta los pagos aprobados que orders no alcanzo a registrar (por ejemplo, si estaba caido)."""
+    while True:
+        await asyncio.sleep(RECONCILIAR_CADA_SEGUNDOS)
+        try:
+            async for pago in pagos.find({"estado": EstadoPago.APROBADO.value, "pedido_sincronizado": False}):
+                # Se usa el request_id original del pago, para que la traza quede unida
+                await sincronizar_pedido(pago.get("request_id", "reconciliacion"), pago)
+        except Exception as error:  # la reconciliacion nunca debe botar el servicio
+            log(SERVICE, level="error", event="reconciliation_failed", error_type=type(error).__name__)
+
+
 async def aplicar_resultado(request: Request, pago: dict, resultado: str, referencia: str) -> dict:
-    """Aplica una sola vez el resultado del proveedor. Un aviso repetido no cambia nada."""
+    """Aplica una sola vez el resultado del proveedor. Un aviso repetido no cambia el resultado."""
     if pago["estado"] != EstadoPago.PENDIENTE.value:
         log(SERVICE, level="info", event="duplicate_notice_ignored", request_id=request_id_de(request),
             pago_id=pago["_id"], estado=pago["estado"])
+        if pago["estado"] == EstadoPago.APROBADO.value and not pago.get("pedido_sincronizado", False):
+            return await sincronizar_pedido(request_id_de(request), pago)  # aprovecha para reintentar
         return pago
 
-    nuevo_estado = EstadoPago.APROBADO.value if resultado == Resultado.APROBADO.value else EstadoPago.RECHAZADO.value
+    aprobado = resultado == Resultado.APROBADO.value
+    cambios = {
+        "estado": EstadoPago.APROBADO.value if aprobado else EstadoPago.RECHAZADO.value,
+        "referencia_proveedor": referencia,
+        "resuelto_en": ahora(),
+    }
+    if aprobado:
+        cambios["pedido_sincronizado"] = False  # se guarda ANTES de llamar a orders
     actualizado = await pagos.find_one_and_update(
         {"_id": pago["_id"], "estado": EstadoPago.PENDIENTE.value},
-        {"$set": {"estado": nuevo_estado, "referencia_proveedor": referencia, "resuelto_en": ahora()}},
+        {"$set": cambios},
         return_document=ReturnDocument.AFTER,
     )
     if actualizado is None:  # otro aviso lo resolvio al mismo tiempo
         return await pagos.find_one({"_id": pago["_id"]})
 
-    if nuevo_estado == EstadoPago.APROBADO.value:
-        resp = await llamar_orders(request, "POST", f"/interno/pedidos/{pago['pedido_id']}/pagado",
-                                   {"pago_id": pago["_id"]})
-        if resp.status_code == 200:
-            boleta = resp.json().get("boleta")
-            await pagos.update_one({"_id": pago["_id"]}, {"$set": {"boleta": boleta}})
-            actualizado["boleta"] = boleta
-        elif resp.status_code == 409:
-            # El pedido ya estaba pagado con otro pago: este se revierte (con el simulador no hay cobro real)
-            actualizado = await pagos.find_one_and_update(
-                {"_id": pago["_id"]}, {"$set": {"estado": EstadoPago.REVERTIDO.value}},
-                return_document=ReturnDocument.AFTER)
-        else:
-            log(SERVICE, level="error", event="order_update_failed", request_id=request_id_de(request),
-                pago_id=pago["_id"], orders_status=resp.status_code)
-
     log(SERVICE, level="info", event="payment_resolved", request_id=request_id_de(request),
         pago_id=pago["_id"], pedido_id=pago["pedido_id"], estado=actualizado["estado"])
+    if aprobado:
+        actualizado = await sincronizar_pedido(request_id_de(request), actualizado)
     return actualizado
 
 
@@ -225,9 +270,11 @@ async def iniciar_pago(
             raise ApiError(409, "IDEMPOTENCY_CONFLICT", "Ese Idempotency-Key ya se uso con otro pedido")
         log(SERVICE, level="info", event="idempotent_replay", request_id=request_id_de(request),
             pago_id=existente["_id"])
+        if existente["estado"] == EstadoPago.APROBADO.value and not existente.get("pedido_sincronizado", False):
+            existente = await sincronizar_pedido(request_id_de(request), existente)
         return salida(existente)
 
-    resp = await llamar_orders(request, "GET", f"/interno/pedidos/{nuevo.pedido_id}")
+    resp = await llamar_orders(request_id_de(request), "GET", f"/interno/pedidos/{nuevo.pedido_id}")
     if resp.status_code == 404:
         raise ApiError(404, "ORDER_NOT_FOUND", "Pedido no encontrado")
     if resp.status_code != 200:

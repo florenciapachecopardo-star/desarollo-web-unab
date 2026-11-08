@@ -85,7 +85,7 @@ _ped1["boleta"] = boleta_de(_ped1["total"], "B-000001", _ped1["creado_en"])
 PAGOS = [
     {"_id": "PAG-0001", "pedido_id": "PED-0001", "cliente_id": "USR-0001", "monto": _ped1["total"],
      "estado": "APROBADO", "proveedor": "simulado", "idempotency_key": "seed-PAG-0001",
-     "request_id": "seed", "creado_en": _ped1["creado_en"], "referencia_proveedor": "SIM-PAG-0001",
+     "request_id": "seed", "creado_en": _ped1["creado_en"], "referencia_proveedor": "SIM-PAG-0001", "pedido_sincronizado": True,
      "boleta": _ped1["boleta"]},
 ]
 

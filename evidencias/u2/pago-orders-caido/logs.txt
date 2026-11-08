@@ -1,0 +1,6 @@
+{"ts": "2026-11-08T02:58:27.555+00:00", "service": "payments", "level": "info", "event": "payment_started", "request_id": "022deb2e4420411f99fc67c6cc7da7cb", "pago_id": "PAG-0002", "pedido_id": "PED-0003", "monto": 8990}
+{"ts": "2026-11-08T02:58:30.732+00:00", "service": "payments", "level": "info", "event": "payment_resolved", "request_id": "aviso-orders-caido-1", "pago_id": "PAG-0002", "pedido_id": "PED-0003", "estado": "APROBADO"}
+{"ts": "2026-11-08T02:58:30.755+00:00", "service": "payments", "level": "warning", "event": "order_sync_pending", "request_id": "aviso-orders-caido-1", "pago_id": "PAG-0002", "pedido_id": "PED-0003", "motivo": "UPSTREAM_UNAVAILABLE"}
+{"ts": "2026-11-08T02:58:30.756+00:00", "service": "payments", "level": "info", "event": "request", "request_id": "aviso-orders-caido-1", "method": "POST", "path": "/pagos/aviso", "status": 200, "user_id": null, "duration_ms": 33.1}
+{"ts": "2026-11-08T02:58:36.025+00:00", "service": "orders", "level": "info", "event": "order_paid", "request_id": "022deb2e4420411f99fc67c6cc7da7cb", "pedido_id": "PED-0003", "pago_id": "PAG-0002", "boleta": "B-000002"}
+{"ts": "2026-11-08T02:58:36.029+00:00", "service": "payments", "level": "info", "event": "order_synced", "request_id": "022deb2e4420411f99fc67c6cc7da7cb", "pago_id": "PAG-0002", "pedido_id": "PED-0003", "estado": "APROBADO"}
