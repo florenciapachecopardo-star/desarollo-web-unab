@@ -51,9 +51,9 @@
 |---|---|---|---|---|---|---|---|---|---|
 | S01 | R01, R07 | F01 | Catálogo: cargar la lista (también llena la ficha y el carrito) | Listar productos con su disponibilidad | `GET /api/v1/productos` | Anónimo | Consulta | inventory | Implementado y conectado |
 | S02 | R01 | F01 | Ficha del producto | Ver el detalle de un producto | `GET /api/v1/productos/{id}` | Anónimo | Consulta | inventory | Implementado; el front no lo llama, la ficha usa los datos de S01 |
-| S03 | R07, R10 | F07 | Panel: crear producto | Agregar un producto al catálogo | `POST /api/v1/productos` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
-| S04 | R07, R10 | F07 | Panel: editar producto | Cambiar datos, precio o stock | `PUT /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
-| S05 | R10 | F07 | Panel: eliminar producto | Quitar un producto del catálogo | `DELETE /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; el panel del front sigue local |
+| S03 | R07, R10 | F07 | Panel: crear producto | Agregar un producto al catálogo | `POST /api/v1/productos` | ADMIN | Transaccional | inventory | Implementado; sin pantalla (el panel interno no está en la U2) |
+| S04 | R07, R10 | F07 | Panel: editar producto | Cambiar datos, precio o stock | `PUT /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; sin pantalla (el panel interno no está en la U2) |
+| S05 | R10 | F07 | Panel: eliminar producto | Quitar un producto del catálogo | `DELETE /api/v1/productos/{id}` | ADMIN | Transaccional | inventory | Implementado; sin pantalla (el panel interno no está en la U2) |
 | S06 | R12 | F03 | Login: botón "Ingresar" | Iniciar sesión | `POST /api/v1/auth/login` | Anónimo | Transaccional | auth (vía gateway) | Implementado y conectado |
 | S07 | R12 | F03 | Menú: "Cerrar sesión" | Cerrar sesión | `POST /api/v1/auth/logout` | Autenticado | Transaccional | auth (vía gateway) | Implementado y conectado |
 | S08 | R12 | F03 | Todas: cargar el usuario actual | Saber quién es y qué rol tiene | `GET /api/v1/auth/me` | Autenticado | Consulta | auth (vía gateway) | Implementado y conectado |
@@ -62,12 +62,12 @@
 | S11 | R01, R04 | F04 | Checkout: botón "Continuar al pago" | Crear un pedido, asociado a la caja del cajero virtual | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders | Implementado y conectado |
 | S12 | R01, R08 | F04 | Pago y Boleta: cargar el pedido | Ver el detalle de un pedido | `GET /api/v1/pedidos/{id}` | CLIENTE dueño, DESPACHO (pedidos pagados), ADMIN | Consulta | orders | Implementado y conectado |
 | S13 | R03 | F06 | Mis pedidos: botón "Anular" | Anular un pedido con motivo | `POST /api/v1/pedidos/{id}/anular` | CLIENTE dueño, ADMIN | Transaccional | orders | Implementado y conectado |
-| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=PAGADO` | DESPACHO, ADMIN | Consulta | orders | Implementado; el panel del front sigue local |
-| S15 | R13 | F08 | Panel: cambiar estado | Marcar en despacho o entregado | `PATCH /api/v1/pedidos/{id}/estado` | DESPACHO, ADMIN | Transaccional | orders | Implementado; el panel del front sigue local |
+| S14 | R02, R13 | F08 | Panel: cola de despacho | Listar pedidos pagados en orden de llegada | `GET /api/v1/pedidos?estado=PAGADO` | DESPACHO, ADMIN | Consulta | orders | Implementado; sin pantalla (el panel interno no está en la U2) |
+| S15 | R13 | F08 | Panel: cambiar estado | Marcar en despacho o entregado | `PATCH /api/v1/pedidos/{id}/estado` | DESPACHO, ADMIN | Transaccional | orders | Implementado; sin pantalla (el panel interno no está en la U2) |
 | S16 | R02, R08 | F04 | Pago: botón "Pagar" | Pagar un pedido propio y emitir la boleta | `POST /api/v1/pagos` | CLIENTE | Transaccional | payments | Implementado y conectado |
 | S17 | R02 | F04 | Sin pantalla (lo llama el proveedor) | Recibir el aviso de pago | `POST /api/v1/pagos/aviso` | Proveedor (secreto propio) | Integración | payments | Implementado (proveedor simulado) |
 | S18 | R01 | F05 | Mis pedidos: cargar la lista | Pedidos propios con datos actuales del producto | `POST /api/v1/graphql` (`misPedidos`, `pedido`) | Autenticado (las queries exigen CLIENTE) | Agregación | graphql-gateway | Implementado y conectado |
-| S19 | R09 | F09 | Panel: reporte de ventas | Ventas por período | `GET /api/v1/reportes/ventas` | DUENO, ADMIN | Analítica | orders | Implementado; el panel del front sigue local |
+| S19 | R09 | F09 | Panel: reporte de ventas | Ventas por período | `GET /api/v1/reportes/ventas` | DUENO, ADMIN | Analítica | orders | Implementado; sin pantalla (el panel interno no está en la U2) |
 
 **Acceso en dos capas:** el gateway revisa la sesión y el rol de la tabla (lista blanca en `gateway.py`). Para S12, S13 y S18 el gateway solo exige sesión, y la regla de propiedad la aplica orders (o graphql-gateway) con la identidad que le pasa el gateway.
 
@@ -371,13 +371,13 @@ Con inventory caído (error parcial, resumido):
 | R04 | **Cubierto.** orders asigna el `cajero_id` USR-0005 (cajero virtual) a cada pedido web | S11 |
 | R05 | **Brecha declarada.** El registro existe en el front pero guarda en localStorage; no hay servicio clients | S09 (no implementado), informe |
 | R06 | **Brecha declarada.** No hay registro por el administrador | Informe |
-| R07 | **Cubierto** en el backend; el panel del front sigue local | S01, S03, S04 |
+| R07 | **Cubierto** en el backend; sin pantalla (el panel interno no está en la U2) | S01, S03, S04 |
 | R08 | **Parcial.** Se emite una boleta numerada con neto e IVA (19 %) al pagar y se ve en `boleta.html`; no se envía por correo | S12, S16, informe |
-| R09 | **Cubierto** en el backend; el panel del front sigue local | S19 |
+| R09 | **Cubierto** en el backend; sin pantalla (el panel interno no está en la U2) | S19 |
 | R10 | **Parcial.** Mantenedor de productos sí (S03 a S05); usuarios y clientes no | Informe |
 | R11 (y la validación de correo de R05) | **Brecha declarada.** La validación se simula en `verificar.html`, sin envío real | M7, informe |
 | R12 | **Cubierto.** Sesión con cookie httponly y permisos por rol en el gateway y en cada servicio | S06, S07, S08, M4 |
-| R13 | **Cubierto** en el backend; el panel del front sigue local | S14, S15 |
+| R13 | **Cubierto** en el backend; sin pantalla (el panel interno no está en la U2) | S14, S15 |
 
 ## 6. Cambios respecto de la versión anterior (INCR-04)
 

@@ -5,73 +5,164 @@
 **Profesor:** Ernesto Vivanco
 **Proyecto:** Chocomanía, Sistema de Ventas Online (Caso 19 adaptado a chocolatería)
 **Integrantes:** Florencia Pacheco y Karla Muñoz
+**Repositorio:** github.com/florenciapachecopardo-star/desarollo-web-unab
 **Fecha de entrega:** lunes 9 de noviembre de 2026
 
 ---
 
 ## Índice
 
-1. [M1. Matriz de servicios y contratos](#m1-matriz-de-servicios-y-contratos)
-2. [M2. Modelo del dominio](#m2-modelo-del-dominio)
-3. [M3. Matriz de sistemas y componentes](#m3-matriz-de-sistemas-y-componentes)
-4. [M4. Stakeholders y matriz de permisos](#m4-stakeholders-y-matriz-de-permisos)
-5. [M5. Gateway y fronteras de confianza](#m5-gateway-y-fronteras-de-confianza)
-6. [M6. Matriz de rutas e inventario de secretos](#m6-matriz-de-rutas-e-inventario-de-secretos)
-7. [M7. Datos sensibles y pruebas de seguridad](#m7-datos-sensibles-y-pruebas-de-seguridad)
-8. [M8. GraphQL Gateway](#m8-graphql-gateway)
-9. [M9. Caracterización de carga y decisiones de arquitectura](#m9-caracterización-de-carga-y-decisiones-de-arquitectura)
-10. [M10. Módulo 10](#m10-módulo-10)
-11. [Brechas declaradas](#brechas-declaradas)
-12. [Anexos y evidencias](#anexos-y-evidencias)
+1. [Resumen](#resumen)
+2. [M1. Matriz de servicios y contratos](#m1-matriz-de-servicios-y-contratos)
+3. [M2. Modelo del dominio](#m2-modelo-del-dominio)
+4. [M3. Matriz de sistemas y componentes](#m3-matriz-de-sistemas-y-componentes)
+5. [M4. Stakeholders y matriz de permisos](#m4-stakeholders-y-matriz-de-permisos)
+6. [M5. Gateway y fronteras de confianza](#m5-gateway-y-fronteras-de-confianza)
+7. [M6. Matriz de rutas e inventario de secretos](#m6-matriz-de-rutas-e-inventario-de-secretos)
+8. [M7. Datos sensibles y pruebas de seguridad](#m7-datos-sensibles-y-pruebas-de-seguridad)
+9. [M8. GraphQL Gateway](#m8-graphql-gateway)
+10. [M9. Caracterización de carga y decisiones de arquitectura](#m9-caracterización-de-carga-y-decisiones-de-arquitectura)
+11. [M10. Backend completo e integración verificable](#m10-backend-completo-e-integración-verificable)
+12. [Matriz de requisitos](#matriz-de-requisitos)
+13. [Brechas declaradas](#brechas-declaradas)
+14. [Anexos y evidencias](#anexos-y-evidencias)
 
 ---
 
+## Resumen
+
+Chocomanía es la tienda online de una chocolatería pequeña. En esta entrega se construyó el backend detrás del front de la Entrega 1: un API Gateway como única puerta de entrada, cinco servicios internos en una red privada (auth, inventory, orders, payments y graphql-gateway), Vault para los secretos del gateway y MongoDB como base. El cliente puede comprar de punta a punta desde el navegador: ver el catálogo, iniciar sesión, crear el pedido, pagarlo, ver la boleta y revisar sus pedidos por GraphQL.
+
+Lo que cruza todo el sistema:
+
+- **Una sola puerta:** solo el gateway publica un puerto (8000) y solo deja pasar las rutas de su lista blanca.
+- **Correlación:** cada solicitud lleva un `X-Request-ID` que aparece en la respuesta, en los logs JSON de cada servicio y en lo que se guarda en la base.
+- **El servidor decide:** precios, totales, montos, estados, cajero y boleta los calcula el backend; lo que mande el navegador se ignora.
+- **Un secreto por integración** y propiedad de los recursos revisada en cada servicio, no solo en el gateway.
+- **Idempotencia** en pedidos y pagos (`Idempotency-Key`).
+
 ## M1. Matriz de servicios y contratos
 
-_Pendiente. Archivo de trabajo: `docs/m1-servicios.md`_
+**Documento:** [`m1-servicios.md`](m1-servicios.md)
+
+13 requisitos (R01 a R13) tomados del Caso 19, 9 flujos (F01 a F09) y 19 servicios (S01 a S19). Cada servicio tiene su requisito, su flujo, la pantalla que lo usa, el acceso, la clasificación (consulta, transaccional, integración, agregación o analítica), el estado de implementación y un ejemplo JSON real tomado del seed o de las evidencias. Las reglas comunes cubren el formato único de error, la validación (422), la correlación, la identidad, el recurso ajeno (404), la idempotencia y qué pasa si un servicio cae.
+
+17 de los 19 servicios están implementados. S09 y S10 (servicio clients) quedan como brecha.
 
 ## M2. Modelo del dominio
 
-_Pendiente. Archivos de trabajo: `docs/uml-dominio.drawio`, `docs/m2-dominio.md`_
+**Documentos:** [`m2-dominio.md`](m2-dominio.md) y [`uml-dominio.drawio`](uml-dominio.drawio)
+
+Diagrama de clases con Usuario, Rol, Cliente, Producto, Pedido, LineaPedido, Boleta y Pago, sus multiplicidades (por ejemplo, Pedido y LineaPedido 1 a 1..* por composición, Pedido y Pago 1 a 0..*), 13 reglas del dominio (D01 a D13) y la máquina de estados del pedido. Confirmado con el código de orders y payments. Cliente queda marcado como no implementado en la U2.
 
 ## M3. Matriz de sistemas y componentes
 
-_Pendiente. Archivos de trabajo: `docs/m3-sistemas.md`, `docs/componentes.drawio`_
+**Documentos:** [`m3-sistemas.md`](m3-sistemas.md) y [`componentes.drawio`](componentes.drawio)
+
+Cada sistema con su responsabilidad, sus datos y su tipo de dependencia (real, doble de prueba o no implementado). Despacho y boletas viven dentro de orders y el proveedor de pago es un doble de prueba que respeta el contrato. Incluye las reglas entre sistemas, la secuencia completa de una compra (crear, pagar y ver mis pedidos) ligada a sus evidencias, y los límites conocidos (por ejemplo, la devolución de stock sin reintento).
 
 ## M4. Stakeholders y matriz de permisos
 
-_Pendiente. Archivos de trabajo: `docs/m4-stakeholders.md`, `docs/m4-permisos.md`_
+**Documentos:** [`m4-stakeholders.md`](m4-stakeholders.md) y [`m4-permisos.md`](m4-permisos.md)
+
+Registro de 11 stakeholders con su interés e influencia. Matriz de permisos por servicio y rol (Anónimo, CLIENTE, ADMIN, DUENO, CAJERO, DESPACHO), las operaciones internas que no expone el gateway (reservas de stock, marcar pagado, lectura para GraphQL) con el secreto que exige cada una, y las reglas que salen de la matriz.
 
 ## M5. Gateway y fronteras de confianza
 
-_Pendiente. Archivos de trabajo: `docs/uml-gateway.drawio`, `docs/m5-gateway.md`_
+**Documentos:** [`m5-gateway.md`](m5-gateway.md) y [`uml-gateway.drawio`](uml-gateway.drawio)
+
+Por qué un solo gateway, el UML de sus clases (incluidas GraphQLGateway, Schema y Resolver), la clasificación de rutas (anónimas, autenticadas, por rol, integración y front estático) y las fronteras de confianza entre navegador, gateway, servicios internos, graphql-gateway y proveedor. Muestra el recorrido de una solicitud autorizada (S11, `crear-pedido-0001`, en cuatro servicios) y el de una denegada (S03 como CLIENTE).
 
 ## M6. Matriz de rutas e inventario de secretos
 
-_Pendiente. Archivo de trabajo: `docs/m6-rutas-secretos.md`_
+**Documento:** [`m6-rutas-secretos.md`](m6-rutas-secretos.md)
+
+Matriz de todas las rutas públicas con método, acceso, servicio destino y controles; inventario de los secretos (uno por integración, quién lo tiene y dónde vive); qué hacer si se filtra una clave; qué pasa si Vault no responde (503 `SECRETS_UNAVAILABLE`, caché de 60 s); y la revisión de secretos en el repo, capturas y logs.
 
 ## M7. Datos sensibles y pruebas de seguridad
 
-_Pendiente. Archivo de trabajo: `docs/m7-datos-sensibles.md`_
+**Documento:** [`m7-datos-sensibles.md`](m7-datos-sensibles.md)
+
+Cinco niveles de clasificación y una matriz de datos con finalidad, custodio, roles, protección, retención y estado real en la U2. Chocomanía no custodia secretos del cliente (no recibe datos de tarjeta). Incluye la minimización, el recorrido de la dirección de despacho, la verificación de correo simulada, las 6 pruebas de seguridad (P01 a P06) y los riesgos de datos que quedan abiertos.
 
 ## M8. GraphQL Gateway
 
-_Pendiente. Archivo de trabajo: `docs/m8-graphql.md`_
+**Documento:** [`m8-graphql.md`](m8-graphql.md)
+
+GraphQL Gateway privado (Strawberry) detrás del API Gateway, con las queries `misPedidos` y `pedido`. Junta orders e inventory con DataLoader (una sola llamada a inventory por consulta), limita profundidad (6), alias (10), tokens (1000) y paginación (20), autoriza por sesión, rol, recurso y campo (`stock` solo ADMIN), y devuelve errores parciales: si inventory cae, los pedidos igual se ven y `producto` viene null con `UPSTREAM_UNAVAILABLE`. Lo usa `mis-pedidos.html`.
 
 ## M9. Caracterización de carga y decisiones de arquitectura
 
-_Pendiente. Archivos de trabajo: `docs/m9-carga.md`, `docs/adr-grpc.md`, `docs/adr-analitica.md`_
+**Documentos:** [`m9-carga.md`](m9-carga.md), [`adr-grpc.md`](adr-grpc.md) y [`adr-analitica.md`](adr-analitica.md)
 
-## M10. Módulo 10
+Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al catálogo por día en peak, menos de 25 solicitudes por segundo. Umbrales fijados antes de medir (p95 del catálogo menor a 500 ms, de crear pedido menor a 1.000 ms, errores menores a 1 %). Script k6 del catálogo en `tests/carga/catalogo.js`.
 
-_Pendiente. Título por confirmar según la pauta._
+- **ADR gRPC:** no se usa. Con esta carga, HTTP con JSON entre servicios alcanza y es más fácil de depurar y correlacionar.
+- **ADR analítica:** el reporte de ventas es un endpoint dentro de orders (S19), no un servicio aparte.
+
+## M10. Backend completo e integración verificable
+
+### Qué está integrado
+
+| Componente | Qué hace | Evidencia |
+|---|---|---|
+| gateway | Lista blanca, sesión por cookie, identidad hacia los servicios, `X-Request-ID`, logs JSON, errores con formato único, secretos desde Vault, front estático en el mismo origen | E01 |
+| auth | Usuarios y sesiones en Mongo, bcrypt costo 12, token guardado como hash, TTL de 900 s | E02 a E06 (`/introspect` en cada traza) |
+| inventory | Catálogo, stock, reservas y devoluciones internas, lote para GraphQL | E01, E02, E05 |
+| orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03 |
+| payments | Pago con idempotencia, proveedor simulado (inmediato o aviso), reconciliación si orders cae | E03, E04 |
+| graphql-gateway | `misPedidos` y `pedido` con DataLoader, límites y errores parciales | E05, E06 |
+| front | Catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | Compra completa registrada en la bitácora (INCR-17); captura pendiente |
+
+### Cómo verificarlo
+
+1. Copiar `.env.example` a `.env` y completar los valores.
+2. `docker compose up -d --build` y esperar a que los servicios queden `healthy`.
+3. `scripts/reset.sh` para cargar el seed (6 usuarios y 5 productos con ID fijos).
+4. Abrir `http://localhost:8000`, iniciar sesión con `cliente@correo.cl` y comprar un producto.
+5. Copiar el `X-Request-ID` de cualquier respuesta y ejecutar `scripts/logs.sh <request_id>` para ver la traza en todos los servicios.
+6. Revisar la base con `docker compose run --rm check pedido PED-0003`.
+
+### Lo que no está en la U2
+
+El servicio clients (registro y perfil), el panel interno (mantenedor, cola de despacho y reporte no tienen pantalla, aunque sus servicios funcionan), el envío de la boleta por correo, el límite de solicitudes y las pruebas con Playwright. Ver [Brechas declaradas](#brechas-declaradas).
+
+### Historial
+
+Cada cambio está en [`bitacora.md`](bitacora.md) (INCR-00 en adelante) y las fallas encontradas en [`incidencias.md`](incidencias.md).
+
+## Matriz de requisitos
+
+**Documento:** [`matriz-requisitos.md`](matriz-requisitos.md)
+
+Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04 y R08 (en parte) tienen evidencia aprobada; R07, R09, R10, R12 y R13 tienen el servicio implementado y la prueba pendiente; R05, R06 y R11 son brechas.
 
 ## Brechas declaradas
 
 | Brecha | Motivo | Módulo donde se declara |
 |---|---|---|
-| | | |
+| Servicio clients no implementado (S09, S10): el registro y el perfil siguen en localStorage, con la clave en texto plano (INC05) | Recorte por tiempo; se priorizó la compra completa | M1, M7 |
+| R06 (registro por el administrador) y R10 para usuarios y clientes | Dependen de clients | M1 |
+| Verificación del correo simulada, sin API de mensajería (R11) | Recorte acordado | M7 |
+| Boleta sin envío por correo (R08 parcial) | Sin servicio de mensajería | M1, M2 |
+| Panel interno sin pantallas: mantenedor de productos, cola de despacho y reporte de ventas solo por API | Recorte por tiempo | M1, M10 |
+| Proveedor de pago simulado (doble de prueba, no Webpay) | Recorte acordado | M3 |
+| Solo el gateway lee secretos de Vault; Vault en modo dev | Entorno local | M6 |
+| Todos los servicios usan el usuario raíz de Mongo | Entorno local | M6, M7 |
+| Cookie sin `secure` en local | No hay HTTPS en local | M6, M7 |
+| Sin límite de solicitudes (rate limit) | Pasa a la Etapa 4 | M6 |
+| Sin pruebas con Playwright | Pasa a la U3; en la U2, evidencia manual | Protocolo de pruebas |
+| Stock descontado sin devolver si un pedido trae un ID mal formado (INC04) | Encontrado en la revisión del 08-11 | Incidencias |
+| Stock descontado sin pedido si inventory responde después del plazo de orders | Requiere reservas con ID propio | M3 |
+| GraphQL: `stock` no lo puede ver nadie (las queries son solo de CLIENTE), lote máximo de 50 productos e introspección activa | Decisiones de alcance | M8 |
+| Cuentas de prueba con sus claves visibles en el login | Facilitan la demo; son ficticias | M7 |
+| Carga medida con k6 pendiente; solo hay proyección | Falta ejecutar el script | M9 |
+| Pruebas P02 a P06 sin ejecutar y evidencias faltantes (reintento idempotente, rechazo por profundidad, capturas del front) | Pendientes de ejecución | M7, matriz de requisitos |
 
 ## Anexos y evidencias
 
-_Índice de evidencias en `evidencias/indice.md`_
+- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E06, cada una con su ficha).
+- Protocolo de pruebas: [`protocolo-pruebas.md`](protocolo-pruebas.md).
+- Incidencias: [`incidencias.md`](incidencias.md).
+- Bitácora de incrementos: [`bitacora.md`](bitacora.md).
+- Reparto de roles: [`reparto-roles-entrega-2-v2.md`](reparto-roles-entrega-2-v2.md).
