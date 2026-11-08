@@ -18,6 +18,7 @@ AUTH_URL = os.getenv("AUTH_URL", "http://auth:8000")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
 ORDERS_URL = os.getenv("ORDERS_URL", "http://orders:8000")
 PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments:8000")
+GRAPHQL_URL = os.getenv("GRAPHQL_URL", "http://graphql-gateway:8000")
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
 VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
@@ -54,6 +55,7 @@ SERVICIOS = {
     "inventory": ServiceTarget(INVENTORY_URL, "backend_shared_secret"),
     "orders": ServiceTarget(ORDERS_URL, "orders_shared_secret"),
     "payments": ServiceTarget(PAYMENTS_URL, "payments_shared_secret"),
+    "graphql": ServiceTarget(GRAPHQL_URL, "graphql_shared_secret"),
 }
 
 RUTAS = [
@@ -72,6 +74,8 @@ RUTAS = [
     # payments: S17 no lleva sesion; payments verifica el secreto propio del proveedor
     RouteDefinition("S16", "POST", "/api/v1/pagos", "rol", ("CLIENTE",), "payments", "/pagos"),
     RouteDefinition("S17", "POST", "/api/v1/pagos/aviso", "anonimo", (), "payments", "/pagos/aviso"),
+    # GraphQL Gateway privado: solo con sesion; la autorizacion por recurso y campo la hace graphql-gateway
+    RouteDefinition("S18", "POST", "/api/v1/graphql", "autenticado", (), "graphql", "/graphql"),
 ]
 
 _PARAM_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")

@@ -32,6 +32,17 @@ def verify_gateway(x_gateway_secret: str = Header(default="")):
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
 
 
+# Secreto propio de la integracion graphql-gateway -> inventory (solo lectura)
+GRAPHQL_INVENTORY_SECRET = os.getenv("GRAPHQL_INVENTORY_SECRET")
+if not GRAPHQL_INVENTORY_SECRET:
+    raise RuntimeError("GRAPHQL_INVENTORY_SECRET no esta configurado")
+
+
+def verify_graphql(x_service_secret: str = Header(default="")):
+    if not secrets.compare_digest(x_service_secret, GRAPHQL_INVENTORY_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solo graphql-gateway puede usar esta operacion")
+
+
 def verify_orders(x_service_secret: str = Header(default="")):
     if not secrets.compare_digest(x_service_secret, ORDERS_INVENTORY_SECRET):
         raise ApiError(403, "FORBIDDEN", "Solo orders puede usar esta operacion")
@@ -173,3 +184,15 @@ async def reservar_stock(solicitud: SolicitudStock):
 async def devolver_stock(solicitud: SolicitudStock):
     await devolver_items([(parse_id(i.producto_id), i.cantidad) for i in solicitud.items])
     return {"status": "OK"}
+
+
+class SolicitudLote(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=50)
+
+
+@app.post("/interno/productos/lote", dependencies=[Depends(verify_graphql)])
+async def productos_por_lote(solicitud: SolicitudLote):
+    """Varios productos en una sola llamada (batching del GraphQL Gateway)."""
+    oids = [parse_id(i) for i in dict.fromkeys(solicitud.ids)]
+    encontrados = {str(p["_id"]): producto_helper(p) async for p in productos_collection.find({"_id": {"$in": oids}})}
+    return {"productos": [encontrados.get(i) for i in solicitud.ids]}
