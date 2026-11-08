@@ -46,6 +46,7 @@ services:
       GATEWAY_INVENTORY_SECRET: ${GATEWAY_INVENTORY_SECRET:?Falta GATEWAY_INVENTORY_SECRET en .env}
       AUTH_INTROSPECTION_SECRET: ${AUTH_INTROSPECTION_SECRET:?Falta AUTH_INTROSPECTION_SECRET en .env}
       GATEWAY_ORDERS_SECRET: ${GATEWAY_ORDERS_SECRET:?Falta GATEWAY_ORDERS_SECRET en .env}
+      GATEWAY_PAYMENTS_SECRET: ${GATEWAY_PAYMENTS_SECRET:?Falta GATEWAY_PAYMENTS_SECRET en .env}
     networks: [privada]
     depends_on:
       vault:
@@ -134,12 +135,36 @@ services:
       MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
       # Menor que el del gateway, para que el error diga que servicio fallo
       UPSTREAM_TIMEOUT_SECONDS: ${ORDERS_UPSTREAM_TIMEOUT_SECONDS:-3}
+      PAYMENTS_ORDERS_SECRET: ${PAYMENTS_ORDERS_SECRET:?Falta PAYMENTS_ORDERS_SECRET en .env}
       FAULT_DELAY_MS: ${ORDERS_FAULT_DELAY_MS:-0}
     networks: [privada]
     depends_on:
       mongo:
         condition: service_healthy
       inventory:
+        condition: service_healthy
+    healthcheck: *healthcheck-python
+
+  payments:
+    build: ./backend/payments
+    image: chocomania-payments:dev
+    environment:
+      INTERNAL_GATEWAY_SECRET: ${GATEWAY_PAYMENTS_SECRET}
+      PAYMENTS_ORDERS_SECRET: ${PAYMENTS_ORDERS_SECRET}
+      PAYMENT_PROVIDER_SECRET: ${PAYMENT_PROVIDER_SECRET:?Falta PAYMENT_PROVIDER_SECRET en .env}
+      ORDERS_URL: http://orders:8000
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      UPSTREAM_TIMEOUT_SECONDS: ${ORDERS_UPSTREAM_TIMEOUT_SECONDS:-3}
+      # Proveedor simulado (doble de prueba): inmediato | aviso, y APROBADO | RECHAZADO
+      SIMULADOR_MODO: ${SIMULADOR_MODO:-inmediato}
+      SIMULADOR_RESULTADO: ${SIMULADOR_RESULTADO:-APROBADO}
+      # Reintento de pagos aprobados que orders no alcanzo a registrar
+      RECONCILIAR_CADA_SEGUNDOS: ${RECONCILIAR_CADA_SEGUNDOS:-15}
+    networks: [privada]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      orders:
         condition: service_healthy
     healthcheck: *healthcheck-python
 
@@ -154,6 +179,7 @@ services:
       AUTH_URL: http://auth:8000
       INVENTORY_URL: http://inventory:8000
       ORDERS_URL: http://orders:8000
+      PAYMENTS_URL: http://payments:8000
       UPSTREAM_TIMEOUT_SECONDS: ${UPSTREAM_TIMEOUT_SECONDS:-5}
     networks: [publica, privada]
     depends_on:
@@ -164,5 +190,7 @@ services:
       inventory:
         condition: service_healthy
       orders:
+        condition: service_healthy
+      payments:
         condition: service_healthy
     healthcheck: *healthcheck-python

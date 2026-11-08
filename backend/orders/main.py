@@ -28,6 +28,9 @@ def requerida(nombre: str) -> str:
 
 INTERNAL_GATEWAY_SECRET = requerida("INTERNAL_GATEWAY_SECRET")
 ORDERS_INVENTORY_SECRET = requerida("ORDERS_INVENTORY_SECRET")
+# Secreto propio de la integracion payments -> orders
+PAYMENTS_ORDERS_SECRET = requerida("PAYMENTS_ORDERS_SECRET")
+IVA = 0.19
 MONGO_URL = requerida("MONGO_URL")
 MONGO_DB = os.getenv("MONGO_DB", "orders")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
@@ -105,6 +108,11 @@ class CambioEstado(BaseModel):
 def verify_gateway(x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+
+
+def verify_payments(x_service_secret: str = Header(default="")):
+    if not secrets.compare_digest(x_service_secret, PAYMENTS_ORDERS_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solo payments puede usar esta operacion")
 
 
 class Identidad(BaseModel):
@@ -392,13 +400,14 @@ async def reporte_ventas(
         raise ApiError(400, "BAD_REQUEST", "La fecha desde no puede ser mayor que hasta")
 
     filtro: dict = {"estado": {"$in": ESTADOS_VENDIDOS}}
+    # Una venta cuenta el dia en que se pago, no el dia en que se creo el pedido
     rango = {}
     if desde:
         rango["$gte"] = datetime.combine(desde, time.min, tzinfo=timezone.utc)
     if hasta:
         rango["$lt"] = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=timezone.utc)
     if rango:
-        filtro["creado_en"] = rango
+        filtro["pagado_en"] = rango
 
     por_producto: dict = {}
     cantidad_pedidos = 0
@@ -420,3 +429,65 @@ async def reporte_ventas(
         "total_ventas": total,
         "por_producto": sorted(por_producto.values(), key=lambda f: -f["monto"]),
     }
+
+
+# ---------------------------------------------------------------------------
+# Operaciones internas para payments (no estan en la lista blanca del gateway)
+# ---------------------------------------------------------------------------
+
+class AvisoPagado(BaseModel):
+    pago_id: str = Field(min_length=1, max_length=40)
+
+
+@app.get("/interno/pedidos/{id}", dependencies=[Depends(verify_payments)])
+async def pedido_para_pago(id: str):
+    """payments consulta el dueno, el estado y el total. El monto nunca lo manda el navegador."""
+    pedido = await pedidos.find_one({"_id": id})
+    if pedido is None:
+        raise no_encontrado()
+    return {"id": pedido["_id"], "cliente_id": pedido["cliente_id"], "estado": pedido["estado"],
+            "total": pedido["total"]}
+
+
+@app.post("/interno/pedidos/{id}/pagado", dependencies=[Depends(verify_payments)])
+async def marcar_pagado(id: str, aviso: AvisoPagado, request: Request):
+    """Solo payments decide que un pedido esta pagado (M3). Emite la boleta (R08, sin envio por correo)."""
+    pedido = await pedidos.find_one({"_id": id})
+    if pedido is None:
+        raise no_encontrado()
+    if pedido.get("pago_id") == aviso.pago_id:
+        # Aviso repetido del mismo pago: ya se registro, aunque el pedido haya avanzado a EN_DESPACHO
+        return salida(pedido, Identidad(user_id="payments", roles=["ADMIN"]))
+
+    momento = ahora()
+    # Primero el cambio de estado (atomico); la boleta se numera solo si se pago de verdad
+    actualizado = await pedidos.find_one_and_update(
+        {"_id": id, "estado": Estado.PENDIENTE_PAGO.value},
+        {"$set": {"estado": Estado.PAGADO.value, "pago_id": aviso.pago_id, "pagado_en": momento},
+         "$push": {"historial": {"estado": Estado.PAGADO.value, "fecha": momento, "por": "payments"}}},
+        return_document=ReturnDocument.AFTER,
+    )
+    if actualizado is None:
+        # Dos avisos del mismo pago al mismo tiempo: si gano el otro con este pago_id, no es un error
+        actual = await pedidos.find_one({"_id": id})
+        if actual and actual.get("pago_id") == aviso.pago_id:
+            return salida(actual, Identidad(user_id="payments", roles=["ADMIN"]))
+        raise ApiError(409, "PEDIDO_NO_PAGABLE",
+                       f"El pedido no esta pendiente de pago (estado actual: {(actual or pedido)['estado']})")
+
+    contador = await contadores.find_one_and_update(
+        {"_id": "boleta"}, {"$inc": {"seq": 1}}, upsert=True, return_document=ReturnDocument.AFTER
+    )
+    neto = round(actualizado["total"] / (1 + IVA))
+    boleta = {
+        "numero": f"B-{contador['seq']:06d}",
+        "fecha": iso(momento),
+        "neto": neto,
+        "iva": actualizado["total"] - neto,
+        "total": actualizado["total"],
+    }
+    await pedidos.update_one({"_id": id}, {"$set": {"boleta": boleta}})
+    actualizado["boleta"] = boleta
+    log(SERVICE, level="info", event="order_paid", request_id=request_id_de(request),
+        pedido_id=id, pago_id=aviso.pago_id, boleta=boleta["numero"])
+    return salida(actualizado, Identidad(user_id="payments", roles=["ADMIN"]))

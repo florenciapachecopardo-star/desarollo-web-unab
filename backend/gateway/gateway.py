@@ -17,6 +17,7 @@ VAULT_TOKEN = os.getenv("VAULT_TOKEN")
 AUTH_URL = os.getenv("AUTH_URL", "http://auth:8000")
 INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
 ORDERS_URL = os.getenv("ORDERS_URL", "http://orders:8000")
+PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments:8000")
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
 VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
@@ -52,6 +53,7 @@ class ServiceTarget:
 SERVICIOS = {
     "inventory": ServiceTarget(INVENTORY_URL, "backend_shared_secret"),
     "orders": ServiceTarget(ORDERS_URL, "orders_shared_secret"),
+    "payments": ServiceTarget(PAYMENTS_URL, "payments_shared_secret"),
 }
 
 RUTAS = [
@@ -67,6 +69,9 @@ RUTAS = [
     RouteDefinition("S14", "GET", "/api/v1/pedidos", "rol", ("DESPACHO", "ADMIN"), "orders", "/pedidos"),
     RouteDefinition("S15", "PATCH", "/api/v1/pedidos/{id}/estado", "rol", ("DESPACHO", "ADMIN"), "orders", "/pedidos/{id}/estado"),
     RouteDefinition("S19", "GET", "/api/v1/reportes/ventas", "rol", ("DUENO", "ADMIN"), "orders", "/reportes/ventas"),
+    # payments: S17 no lleva sesion; payments verifica el secreto propio del proveedor
+    RouteDefinition("S16", "POST", "/api/v1/pagos", "rol", ("CLIENTE",), "payments", "/pagos"),
+    RouteDefinition("S17", "POST", "/api/v1/pagos/aviso", "anonimo", (), "payments", "/pagos/aviso"),
 ]
 
 _PARAM_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -164,7 +169,7 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
     if identidad:
         headers["X-Authenticated-User"] = identidad["user_id"]
         headers["X-Authenticated-Roles"] = ",".join(identidad["roles"])
-    for nombre in ("content-type", "idempotency-key"):
+    for nombre in ("content-type", "idempotency-key", "x-proveedor-secret"):
         if request.headers.get(nombre):
             headers[nombre] = request.headers[nombre]
 
