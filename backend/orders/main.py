@@ -30,6 +30,8 @@ INTERNAL_GATEWAY_SECRET = requerida("INTERNAL_GATEWAY_SECRET")
 ORDERS_INVENTORY_SECRET = requerida("ORDERS_INVENTORY_SECRET")
 # Secreto propio de la integracion payments -> orders
 PAYMENTS_ORDERS_SECRET = requerida("PAYMENTS_ORDERS_SECRET")
+# Secreto propio de la integracion graphql-gateway -> orders (solo lectura)
+GRAPHQL_ORDERS_SECRET = requerida("GRAPHQL_ORDERS_SECRET")
 IVA = 0.19
 MONGO_URL = requerida("MONGO_URL")
 MONGO_DB = os.getenv("MONGO_DB", "orders")
@@ -107,6 +109,13 @@ class CambioEstado(BaseModel):
 
 def verify_gateway(x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+
+
+def verify_lectura(x_gateway_secret: str = Header(default="")):
+    """Lecturas: las acepta el API Gateway o el GraphQL Gateway, cada uno con su propio secreto."""
+    if not (secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET)
+            or secrets.compare_digest(x_gateway_secret, GRAPHQL_ORDERS_SECRET)):
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
 
 
@@ -290,10 +299,11 @@ async def crear_pedido(
     return salida(pedido, quien)
 
 
-@app.get("/pedidos", dependencies=[Depends(verify_gateway)])
+@app.get("/pedidos", dependencies=[Depends(verify_lectura)])
 async def listar_pedidos(
     estado: Optional[Estado] = None,
     pagina: int = Query(default=1, ge=1),
+    por_pagina: int = Query(default=20, ge=1, le=50),
     quien: Identidad = Depends(identidad),
 ):
     """S14 (cola de despacho, DESPACHO/ADMIN). Un CLIENTE solo recibe los suyos."""
@@ -309,13 +319,12 @@ async def listar_pedidos(
     else:
         filtro["cliente_id"] = quien.user_id
 
-    por_pagina = 20
     total = await pedidos.count_documents(filtro)
     cursor = pedidos.find(filtro).sort("creado_en", 1).skip((pagina - 1) * por_pagina).limit(por_pagina)
     return {"pedidos": [salida(p, quien) async for p in cursor], "pagina": pagina, "total": total}
 
 
-@app.get("/pedidos/{id}", dependencies=[Depends(verify_gateway)])
+@app.get("/pedidos/{id}", dependencies=[Depends(verify_lectura)])
 async def ver_pedido(id: str, quien: Identidad = Depends(identidad)):
     """S12."""
     pedido = await pedidos.find_one({"_id": id})
