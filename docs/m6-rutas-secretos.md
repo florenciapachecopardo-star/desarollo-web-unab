@@ -105,7 +105,7 @@ Valores que ya se dan por quemados (quedaron en el historial de git en semanas a
 | `.env.example` | Solo nombres, todos vacíos |
 | Logs | El gateway registra `secret_loaded` con los nombres de las claves, nunca los valores. Los logs no incluyen tokens, cookies, contraseñas ni correos |
 | Evidencias (`evidencias/u2/`) | Revisadas: sin secretos ni tokens; solo datos ficticios |
-| `backend/gateway/README.md` | **Pendiente de corregir:** todavía tiene las instrucciones de la Semana 8 con los secretos de laboratorio quemados. Flo lo borra en el PR de cierre |
+| `backend/gateway/README.md` | Tenía las instrucciones de la Semana 8 con secretos de laboratorio quemados. **Borrado** en INCR-24. Siguen en el historial de git; eran valores de laboratorio que no se usan en el stack actual |
 | `frontend/js/login.js` | Muestra las cuentas de prueba del seed con sus claves, para el laboratorio. Son ficticias, pero incluyen ADMIN: no se pueden usar fuera del entorno local |
 
 ## 8. Brechas declaradas

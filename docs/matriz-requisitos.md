@@ -1,12 +1,12 @@
 # Matriz de requisitos: pantalla, servicio, prueba, resultado y evidencia
 
-Une cada requisito del Caso 19 (R01 a R13, detalle en `docs/m1-servicios.md`) con la pantalla donde se usa, el servicio que lo atiende, la prueba que lo comprueba y su evidencia. Revisada contra `main` (bdd26ff) y actualizada con las pruebas del 08-11-2026 (E07 y E08).
+Une cada requisito del Caso 19 (R01 a R13, detalle en `docs/m1-servicios.md`) con la pantalla donde se usa, el servicio que lo atiende, la prueba que lo comprueba y su evidencia. Revisada contra `main` (bdd26ff) y actualizada con las pruebas del 08-11-2026 (E07 y E08) y las capturas del front (E09).
 
 **Estados:** Aprobada (hay evidencia), Pendiente (la prueba existe pero no se ha ejecutado), Brecha (no se construyó en la U2).
 
 | Requisito | Pantalla | Servicio | Prueba | Resultado | Evidencia |
 |---|---|---|---|---|---|
-| R01 El cliente arma un pedido con los productos disponibles | `index.html` (catálogo), `carrito.html`, `checkout.html`, `mis-pedidos.html` | S01, S11, S12, S18 | P01, P04, P06, C01 a C05, C08, C09 | Aprobada | E01, E02, E05, E06, E07, E08 |
+| R01 El cliente arma un pedido con los productos disponibles | `index.html` (catálogo), `carrito.html`, `checkout.html`, `mis-pedidos.html` | S01, S11, S12, S18 | P01, P04, P06, C01 a C05, C08, C09 | Aprobada | E01, E02, E05, E06, E07, E08, E09 |
 | R02 El pedido se prepara solo después de confirmar el pago | `pago.html` | S16, S17 (S14 filtra pagados) | P06, C06, C07 | Aprobada para el pago. La cola de despacho (S14) no tiene evidencia | E03, E04, E07 |
 | R03 El cliente puede anular una compra indicando el motivo | `mis-pedidos.html` (botón "Anular") | S13 | E02 | Aprobada | E02 (estado ANULADO, motivo y `stock_devuelto: true`) |
 | R04 Las ventas web se asocian a la caja de un cajero virtual | No tiene pantalla (lo asigna orders) | S11 | E02 | Aprobada | E02 (`cajero_id` USR-0005) |
@@ -29,4 +29,3 @@ Las pruebas P01 a P06, la idempotencia, el rechazo por profundidad en GraphQL y 
 | Sin ID | Cola de despacho (S14) y cambio de estado (S15) | R02, R13 |
 | Sin ID | Reporte de ventas (S19) | R09 |
 | Sin ID | ADMIN crea, edita y elimina un producto (S03 a S05) | R07, R10 |
-| P07 | Captura de la compra completa desde el navegador | R01 |
