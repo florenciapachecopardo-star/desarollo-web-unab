@@ -14,6 +14,7 @@ Cada evidencia tiene su ficha, hecha con `evidencias/plantilla-ficha.md`. Las de
 | E06 | `misPedidos` con inventory caído: pedidos visibles y `producto` null con `UPSTREAM_UNAVAILABLE` (error parcial). Aprobada | M8, M10 | `u2/graphql-error-parcial/ficha-E06.md` | `u2/graphql-error-parcial/respuesta.json`, `u2/graphql-error-parcial/logs.txt` |
 | E07 | 16 pruebas automáticas con pytest: P01 a P06, idempotencia de S11 y S16, Idempotency-Key obligatorio, sin stock, INC04 y rechazo por profundidad en GraphQL. Aprobada (16 de 16) | M4, M7, M8, M10 | `u2/pytest/ficha-E07.md` | `u2/pytest/resultado.txt`, `u2/pytest/junit.xml`, `u2/pytest/logs.txt` |
 | E08 | Carga del catálogo con k6: primera ejecución fallida (p95 3,2 s, INC06) y segunda aprobada después del arreglo (p95 19 ms, 65 req/s, 0 % de errores) | M9 | `u2/ficha-E08.md` | `u2/k6-catalogo-antes.json`, `u2/k6-catalogo.json` |
+| E09 | Compra completa desde el navegador (PED-0004, boleta B-000003), vista de celular y aviso de Mis pedidos con inventory caído (P07). Aprobada | M8, M10 | `u2/front/ficha-E09.md` | `u2/front/01-catalogo.png` a `u2/front/10-mis-pedidos-inventory-recuperado.png` |
 
 ## Entrega 3 (U3)
 
