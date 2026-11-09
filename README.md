@@ -1,105 +1,100 @@
-# Chocomanía — Frontend
+# Chocomanía, Sistema de Ventas Online
 
-Sitio web de una chocolatería con delivery, hecho en **HTML, CSS y JavaScript puro**,
-sin frameworks ni servidor. Es la aplicación del **Caso 19 "Sistema de Ventas On-line"**
-(en el enunciado original es una sushería; aquí se adaptó a una chocolatería artesanal).
+Tienda online de una chocolatería artesanal, basada en el **Caso 19 "Sistema de Ventas On-line"** y adaptada de sushería a chocolatería.
 
-La entrega pedida es solo el **frontend**, así que todo lo que en el caso sería trabajo
-del servidor (base de datos, envío de correos, cobros reales) está **simulado** y se
-indica dónde corresponde.
+**Asignatura:** Desarrollo Web y Móvil, UNAB, sección 8750
+**Integrantes:** Florencia Pacheco y Karla Muñoz
+**Versión entregada (Unidad 2):** tag `u2-final`
 
-## Cómo verlo
+El informe completo de la entrega está en [`docs/informe.md`](docs/informe.md).
 
-Abre `index.html` con doble clic. Funciona directo desde la carpeta, sin instalar nada.
-Las carpetas `css/`, `js/`, `img/` y `fonts/` tienen que quedar al lado de los `.html`.
+## Qué hay en el repo
 
-La primera vez que se abre, el sitio carga solo unos **datos de ejemplo** (productos,
-clientes, un usuario por cada perfil y algunos pedidos). Se guardan en el navegador con
-`localStorage` y se conservan al recargar.
+| Carpeta | Contenido |
+|---|---|
+| `frontend/` | Sitio responsivo en HTML, CSS y JavaScript. Llama a la API real por el gateway |
+| `backend/` | Un servicio por carpeta: `gateway`, `auth`, `inventory`, `orders`, `payments` y `graphql-gateway` (FastAPI) |
+| `docker-compose.yml` | Levanta todo el sistema: servicios, MongoDB y Vault |
+| `scripts/` | Seed, reset, revisión de la base, logs por solicitud y generación del `.env` |
+| `tests/api/` | Pruebas automáticas (pytest) |
+| `tests/carga/` | Prueba de carga del catálogo (k6) |
+| `docs/` | Informe, módulos M1 a M9, diagramas `.drawio`, bitácora e incidencias |
+| `evidencias/` | Evidencias de ejecución (E01 a E09), con su índice en `evidencias/indice.md` |
+| `archivo/`, `Semana12/` | Trabajos semanales del curso. No son parte de la entrega |
+
+## Arquitectura en corto
+
+- **Un solo punto de entrada:** solo el gateway publica un puerto (`8000`). También sirve el front, así que front y API están en el mismo origen.
+- **Red privada:** auth, inventory, orders, payments, graphql-gateway, Vault y Mongo están en una red `internal` de Docker, sin acceso desde fuera.
+- **Secretos:** un secreto por integración. Se definen en `.env`, que nunca se sube al repo; el gateway los lee desde Vault.
+- **Sesión:** cookie `httponly` con un token que expira a los 15 minutos. Las claves se guardan con bcrypt.
+- **Correlación:** cada solicitud lleva un `X-Request-ID`, que aparece en la respuesta y en los logs de todos los servicios.
+
+## Requisitos
+
+- Docker Desktop con Docker Compose v2. Se probó con Docker 29.9.2 y Compose v5.6.1.
+- Puerto `8000` libre.
+
+## Cómo levantarlo
+
+**1. Crear el `.env`**, con un secreto aleatorio en cada variable:
+
+```bash
+# Linux, macOS o Git Bash con openssl: copiar el ejemplo y completar cada valor con  openssl rand -hex 32
+cp .env.example .env
+
+# Windows sin openssl (PowerShell, desde la raíz del repo):
+docker run --rm -v "${PWD}:/repo" -w /repo python:3.12.7-slim-bookworm python scripts/generar-env.py
+```
+
+**2. Levantar el sistema** y esperar a que todos los servicios queden `healthy`:
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+**3. Cargar los datos de prueba** (6 usuarios, 5 productos y 2 pedidos, todos ficticios):
+
+```bash
+docker compose run --rm seed --reset
+```
+
+**4. Abrir** <http://localhost:8000>.
+
+**Para detenerlo:** `docker compose down`. Para borrar también la base: `docker compose down -v`.
 
 ## Cuentas de prueba
 
-En la pantalla de ingreso están visibles y se completan con un clic.
+Son ficticias y las crea el seed.
 
-| Perfil        | Correo                    | Contraseña   |
-|---------------|---------------------------|--------------|
-| Cliente       | cliente@correo.cl         | Cliente2026  |
-| Administrador | admin@chocomania.cl       | Admin2026    |
-| Dueño         | dueno@chocomania.cl       | Dueno2026    |
-| Cajero        | cajero@chocomania.cl      | Cajero2026   |
-| Despacho      | despacho@chocomania.cl    | Despacho2026 |
+| Rol | Correo | Clave |
+|---|---|---|
+| Cliente | `cliente@correo.cl` | `Cliente2026` |
+| Cliente 2 | `diego@correo.cl` | `Diego2026` |
+| Administrador | `admin@chocomania.cl` | `Admin2026` |
+| Dueña | `dueno@chocomania.cl` | `Dueno2026` |
+| Cajero virtual | `cajero@chocomania.cl` | `Cajero2026` |
+| Despacho | `despacho@chocomania.cl` | `Despacho2026` |
 
-## Cómo está armado
+## Pruebas
 
-Es un sitio **multipágina**: cada `.html` es una página, y comparten los mismos estilos
-y los mismos archivos de JavaScript. No hay base de datos: todo se guarda en el
-`localStorage` del navegador.
+Antes de cada ronda, deja la base en su estado inicial:
 
-### Páginas
+```bash
+docker compose run --rm seed --reset      # o: scripts/reset.sh
+```
 
-| Archivo            | Qué es                                                        |
-|--------------------|--------------------------------------------------------------|
-| `index.html`       | Inicio: productos destacados, filtro por categoría, "nosotros" |
-| `producto.html`    | Ficha de un producto y sus relacionados                      |
-| `carrito.html`     | Carrito con cantidades y total                               |
-| `checkout.html`    | Confirmar pedido: entrega y medio de pago (exige sesión)     |
-| `pago.html`        | Pago simulado (Webpay o depósito)                            |
-| `boleta.html`      | Boleta digital imprimible                                    |
-| `mis-pedidos.html` | Pedidos del cliente, con estado y anulación                  |
-| `login.html`       | Ingreso de clientes y del personal                           |
-| `registro.html`    | Registro de clientes                                         |
-| `verificar.html`   | Verificación del correo (simulada)                           |
-| `ayuda.html`       | Preguntas frecuentes                                         |
-| `ubicacion.html`   | Dirección y horario                                          |
-| `contacto.html`    | Formulario de contacto                                       |
+| Qué | Comando | Resultado en |
+|---|---|---|
+| Pruebas automáticas (P01 a P06, idempotencia, GraphQL) | `docker compose run --rm pruebas` | `evidencias/u2/pytest/` |
+| Carga del catálogo (k6) | `docker compose run --rm k6` | `evidencias/u2/k6-catalogo.json` |
+| Revisar un pedido o producto en la base | `docker compose run --rm check pedido PED-0001` | Pantalla |
+| Ver la traza de una solicitud en todos los servicios | `scripts/logs.sh <X-Request-ID>` | Pantalla |
+| Estado de un servicio | `curl http://localhost:8000/health` | Pantalla |
 
-### JavaScript
+El protocolo completo está en [`docs/protocolo-pruebas.md`](docs/protocolo-pruebas.md), y la relación entre requisitos, pantallas, servicios y pruebas, en [`docs/matriz-requisitos.md`](docs/matriz-requisitos.md).
 
-Los archivos se cargan como scripts clásicos (en el orden que indica cada `.html`) y
-cada uno se encarga de una cosa:
+## Lo que no está en esta entrega
 
-- `datos.js` — la "base de datos": lee y guarda en `localStorage` y carga los datos de ejemplo la primera vez.
-- `cuentas.js` — registro, ingreso, sesión y la validación del RUN (módulo 11).
-- `geografia.js` — regiones, provincias, comunas y las comunas con despacho.
-- `carrito.js` — el carrito: agregar, quitar, cambiar cantidades y calcular el total.
-- `pedidos.js` — pedidos, pagos, boletas y anulación.
-- `ui.js` — utilidades compartidas: formato de precios y fechas, y la cuenta de la cabecera.
-- `productos.js` — arma las tarjetas de producto.
-- El resto (`home.js`, `producto.js`, `carrito-pagina.js`, `login.js`, `registro.js`, `verificar.js`, `checkout.js`, `pago.js`, `boleta.js`, `mis-pedidos.js`, `ayuda.js`, `contacto.js`) es el código propio de cada página.
-
-## Requerimientos del caso
-
-### Hecho en esta entrega (parte del cliente)
-
-| Requerimiento                                             | Dónde                                  |
-|----------------------------------------------------------|----------------------------------------|
-| Armar un pedido con los productos                        | `carrito.html`                         |
-| El pedido se prepara solo con el pago confirmado         | El pedido nace pendiente de pago       |
-| Anular una compra indicando el motivo                    | `mis-pedidos.html`                     |
-| Comprar solo con sesión de cliente registrado            | `checkout.html` exige sesión           |
-| Registro de cliente con los 10 datos y RUN validado      | `registro.html`                        |
-| Validar la existencia del correo (simulada)              | `verificar.html`, con código de 6 dígitos |
-| Boleta digital por cada venta                            | `boleta.html`, con neto e IVA          |
-| Autenticación de clientes y personal                     | `login.html`                           |
-| Despacho gratis dentro de 3 km                           | Solo las comunas cubiertas (checkout)  |
-| Diseño responsive y mensajes de error claros             | En todas las páginas                   |
-
-### Pendiente para la próxima entrega (panel interno)
-
-Todavía **no** están hechas estas partes, todas del lado del personal:
-
-- Mantenedores de productos (con disponible/agotado), clientes y usuarios.
-- Caja del cajero: confirmar los depósitos bancarios.
-- Despacho: cola de pedidos por orden de llegada e impresión de órdenes.
-- Reporte de ventas por período para el dueño.
-
-## Lo que se simula
-
-Un frontend sin servidor no puede hacer todo lo que pide el caso:
-
-- **Pago externo (Webpay / depósito).** La pantalla de pago es una imitación: al pagar, el sistema responde como si la plataforma hubiera confirmado.
-- **Validación del correo.** No se puede comprobar que un correo existe ni enviarlo. El código de verificación se muestra en pantalla, como si hubiera llegado al correo.
-- **Radio de 3 km.** Sin un servicio de mapas no se mide la distancia exacta; se aproxima con las comunas cercanas al local (Providencia, Ñuñoa, Santiago, Recoleta, Las Condes e Independencia).
-
-Los requerimientos de base de datos Oracle, .NET/J2EE, procedimientos almacenados y
-web services corresponden al backend y no aplican a esta entrega de frontend.
+El servicio clients (el registro y el perfil siguen en el navegador), el panel interno (sus servicios funcionan por API, pero no tiene pantallas), el envío de la boleta por correo, la verificación de correo con una API de mensajería, el límite de solicitudes y las pruebas con Playwright. El pago usa un proveedor simulado, no Webpay. El detalle y los motivos están en la sección "Brechas declaradas" de [`docs/informe.md`](docs/informe.md).
