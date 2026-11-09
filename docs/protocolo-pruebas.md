@@ -66,4 +66,4 @@ En la U2 las pruebas de interfaz se registran a mano. Cada una lleva su ficha co
 
 | ID | Flujo | Rol | Resultado | Evidencia |
 |---|---|---|---|---|
-| P07 | F01, F03, F04, F05: compra completa desde el navegador (catálogo, login, checkout, pago, boleta y mis pedidos) | CLIENTE | Hecha por Flo al conectar el front (INCR-17): PED-0003 pagado con boleta B-000002. Falta guardar la captura | Bitácora INCR-17 |
+| P07 | F01, F03, F04, F05: compra completa desde el navegador (catálogo, login, checkout, pago, boleta y mis pedidos), vista de celular y mis pedidos con inventory caído | CLIENTE | **Aprobada:** PED-0004 pagado con boleta B-000003; pantallas adaptadas al celular; con inventory caído los pedidos siguen visibles con un aviso | E09 |

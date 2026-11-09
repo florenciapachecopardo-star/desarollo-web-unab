@@ -114,7 +114,7 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 | orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03 |
 | payments | Pago con idempotencia, proveedor simulado (inmediato o aviso), reconciliación si orders cae | E03, E04 |
 | graphql-gateway | `misPedidos` y `pedido` con DataLoader, límites y errores parciales | E05, E06 |
-| front | Catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | Compra completa registrada en la bitácora (INCR-17); captura pendiente |
+| front | Catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | E09 (escritorio, celular y error parcial) |
 
 ### Cómo verificarlo
 
@@ -159,11 +159,11 @@ Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01
 | GraphQL: `stock` no lo puede ver nadie (las queries son solo de CLIENTE), lote máximo de 50 productos e introspección activa | Decisiones de alcance | M8 |
 | Cuentas de prueba con sus claves visibles en el login | Facilitan la demo; son ficticias | M7 |
 | CPU y memoria no medidas en la prueba de carga; orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud | Solo se sometió a carga el catálogo | M9 |
-| Sin evidencia de la cola de despacho, el reporte de ventas, el mantenedor de productos como ADMIN ni capturas del front | No tienen pantalla o faltó guardar la captura | Matriz de requisitos |
+| Sin evidencia de la cola de despacho, el reporte de ventas ni el mantenedor de productos como ADMIN | No tienen pantalla en la U2 | Matriz de requisitos |
 
 ## Anexos y evidencias
 
-- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E08, cada una con su ficha).
+- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E09, cada una con su ficha).
 - Protocolo de pruebas: [`protocolo-pruebas.md`](protocolo-pruebas.md).
 - Incidencias: [`incidencias.md`](incidencias.md).
 - Bitácora de incrementos: [`bitacora.md`](bitacora.md).
