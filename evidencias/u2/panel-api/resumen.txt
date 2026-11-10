@@ -1,0 +1,9 @@
+s03-crear | POST /api/v1/productos | 201 | 2005ef66b05c4d3c829a318806249b67
+s04-editar | PUT /api/v1/productos/6af2603c220ca79eaf86c880 | 200 | d6e7f7e21aa04cb3a19590ca55ceecf4
+s05-eliminar | DELETE /api/v1/productos/6af2603c220ca79eaf86c880 | 200 | a00453f2811140b4bb3091580a9851ef
+s14-cola | GET /api/v1/pedidos?estado=PAGADO | 200 | 598c28e2dfc44293a498deebdc32e669
+s15-en-despacho | PATCH /api/v1/pedidos/PED-0001/estado | 200 | 2713245d01ff496d8ef9e30810293e4c
+s15-entregado | PATCH /api/v1/pedidos/PED-0001/estado | 200 | 55b1333620d243eebf5207cad03f382a
+s15-salto-invalido | PATCH /api/v1/pedidos/PED-0002/estado | 409 | 5fe9266d56ba466f8f9f2102e1631604
+s19-reporte | GET /api/v1/reportes/ventas | 200 | abfde04a40c74afea8d9e5485e22ee27
+s19-denegado | GET /api/v1/reportes/ventas | 403 | 8e6dfc1549884ce88de8a1ab33727283
