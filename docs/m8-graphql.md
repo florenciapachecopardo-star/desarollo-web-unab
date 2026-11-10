@@ -193,8 +193,6 @@ Con el campo `disponible`, la pantalla marca "(hoy agotado)" en los productos qu
 
 ## 10. Límites conocidos
 
-1. **Sin evidencia guardada del rechazo por profundidad.** Según las notas del PR #37 se probó con una consulta de profundidad 9, pero no hay archivos en `evidencias/`. Queda pendiente guardarla.
-2. **`stock` solo se puede mostrar denegado.** Las queries son solo para CLIENTE, así que un ADMIN no llega a ese campo: la autorización por campo se demuestra con el caso `FORBIDDEN_FIELD`, no con el permitido.
-3. **Introspección activa.** Strawberry permite consultar el schema (`__schema`). El riesgo es bajo, porque solo se llega con sesión y a través del gateway.
-4. **Más de 50 productos distintos en una página.** La operación por lote de inventory acepta máximo 50 ID. Si una página de pedidos tuviera más productos distintos, todos los `producto` vendrían en `null` con `UPSTREAM_ERROR`. Con el catálogo actual (5 productos) no puede pasar.
-5. **Captura desde el front pendiente.** La pantalla `mis-pedidos.html` usa GraphQL (PR #38), pero todavía no hay una captura guardada como evidencia.
+1. **`stock` solo se puede mostrar denegado.** Las queries son solo para CLIENTE, así que un ADMIN no llega a ese campo: la autorización por campo se demuestra con el caso `FORBIDDEN_FIELD`, no con el permitido.
+2. **Introspección activa.** Strawberry permite consultar el schema (`__schema`). El riesgo es bajo, porque solo se llega con sesión y a través del gateway.
+3. **Más de 50 productos distintos en una página.** La operación por lote de inventory acepta máximo 50 ID. Si una página de pedidos tuviera más productos distintos, todos los `producto` vendrían en `null` con `UPSTREAM_ERROR`. Con el catálogo actual (5 productos) no puede pasar.

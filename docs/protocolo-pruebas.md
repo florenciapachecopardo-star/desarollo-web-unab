@@ -58,7 +58,11 @@ Los requisitos (R), servicios (S) y flujos (F) están en `docs/m1-servicios.md`.
 | C06 | S16 | Mismo `Idempotency-Key` dos veces | 201 y el mismo pago | 201 y mismo pago | E07 |
 | C07 | S16 | Pagar un pedido ya pagado con otra clave | 409 `PEDIDO_NO_PAGABLE` | 409 | E07 |
 | C08 | S18 | Consulta con profundidad mayor a 6 | Rechazada, sin datos | Error de profundidad máxima | E07 |
-| C09 | S01 | Carga de 100 usuarios (M9) | p95 < 500 ms, ≥ 25 req/s, errores < 1 % | 19,2 ms, 65 req/s, 0 % (después de INC06) | E08 |
+| C10 | S14, S15 | DESPACHO ve la cola y lleva PED-0001 de PAGADO a EN_DESPACHO y a ENTREGADO | 200 en las tres | 200, 200 y 200 | E10 |
+| C11 | S03, S04, S05 | ADMIN crea, edita y elimina un producto | 201, 200 y 200 | 201, 200 y 200 | E10 |
+| C12 | S15 | Salto inválido de PENDIENTE_PAGO a ENTREGADO | 409 `TRANSICION_INVALIDA` | 409 | E10 |
+| C13 | S19 | Reporte de ventas como DUENO y como DESPACHO | 200 y 403 | 200 y 403 | E10 |
+| C09 | S01 | Carga de 100 usuarios (M9) | p95 < 500 ms, ≥ 25 req/s, errores < 1 % | 19,2 ms, 65 req/s, 0 % (después de INC06) | E08 (incluye la corrida con `docker stats`) |
 
 ## 7. Pruebas manuales (U2)
 
