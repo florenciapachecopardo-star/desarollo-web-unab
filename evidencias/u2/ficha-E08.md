@@ -44,12 +44,13 @@
 |---|---|
 | `evidencias/u2/k6-catalogo-antes.json` | Resumen de k6 de la primera ejecución, con los umbrales en `ok: false` |
 | `evidencias/u2/k6-catalogo.json` | Resumen de k6 de la segunda ejecución, con todos los umbrales en `ok: true` |
+| `evidencias/u2/k6-catalogo-con-stats.json` y `evidencias/u2/k6-docker-stats.csv` | Tercera ejecución, con los umbrales en `ok: true` y CPU y memoria de cada contenedor |
 | `tests/carga/catalogo.js` | Escenario y umbrales |
 | `docs/incidencias.md` (INC06) | Causa y arreglo |
 
 ## Límites de interpretación
 
-- No se midió CPU ni memoria de los contenedores (`docker stats`), así que esos dos indicadores del M9 quedan sin dato.
+- CPU y memoria no se midieron en estas dos ejecuciones. Se midieron en una tercera, hecha por Flo el 09-11-2026 en otro equipo con `docker stats`: p95 de 59,8 ms, 63,7 req/s y 0 % de errores; CPU máxima de 87 % (gateway) y 93 % (inventory) de un núcleo; memoria máxima de 57,5 MiB y 92,9 MiB; sin reinicios (`k6-catalogo-con-stats.json` y `k6-docker-stats.csv`, detalle en el M9).
 - k6 corre en el mismo computador que el stack, dentro de Docker: la carga del generador compite con la de los servicios.
 - Solo se prueba el catálogo; pedidos y pagos no se sometieron a carga.
 - Una ejecución por versión.
