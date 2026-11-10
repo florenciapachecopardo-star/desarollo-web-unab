@@ -10,7 +10,7 @@ Diagrama: `docs/uml-dominio.drawio` (se abre en app.diagrams.net)
 |---|---|---|
 | Usuario | Cuenta para iniciar sesión, con un rol | auth |
 | Rol | CLIENTE, ADMIN, DUENO, CAJERO, DESPACHO | auth |
-| Cliente | Persona que compra, identificada por su RUN. **No implementado en la U2** (el servicio clients es una brecha); hoy el comprador es el Usuario con rol CLIENTE | clients |
+| Cliente | Persona que compra, identificada por su RUN (perfil: RUN, nombre, contacto, dirección, verificado). Su id es el mismo del Usuario con rol CLIENTE que crea auth al registrarse | clients |
 | Producto | Producto del catálogo (categoría barras, bombones o trufas), con precio y stock. `disponible` se calcula desde el stock | inventory |
 | Pedido | Compra de un cliente, con su estado, el cajero virtual asignado, la dirección de despacho y el historial de estados | orders |
 | LineaPedido | Un producto dentro de un pedido, con cantidad y precio | orders |
@@ -40,7 +40,7 @@ Diagrama: `docs/uml-dominio.drawio` (se abre en app.diagrams.net)
 | D06 | El total del pedido es la suma de los subtotales de sus líneas | orders |
 | D07 | Un pedido tiene como máximo un pago APROBADO. Si llega un segundo aprobado, queda REVERTIDO | payments, orders |
 | D08 | La boleta se emite solo cuando el pedido pasa a PAGADO | orders |
-| D09 | El correo del usuario es único. El RUN del cliente sería único y validado con dígito verificador (clients no implementado) | auth, clients |
+| D09 | El correo del usuario es único. El RUN del cliente es único y se valida con dígito verificador en clients (además del front) | auth, clients |
 | D10 | La contraseña se guarda solo como hash bcrypt | auth |
 | D11 | Solo DESPACHO o ADMIN cambian un pedido a EN_DESPACHO o ENTREGADO | orders |
 | D12 | Cada pedido web queda asociado al cajero virtual USR-0005 | orders |
@@ -65,4 +65,4 @@ Los estados y atributos se confirmaron con orders y payments (PR #32 y #33). Cam
 - Pedido agrega `cliente_id`, `cajero_id`, `creado_en`, `pagado_en`, `despacho`, `historial` y `motivo_anulacion`.
 - Boleta usa número con formato `B-000002`, neto e IVA, y no tiene correo de destino (R08 parcial).
 - Pago agrega el estado REVERTIDO, el proveedor y `pedido_sincronizado`.
-- Cliente queda marcado como no implementado en la U2.
+- Cliente está implementado en el servicio clients; comparte el id con su Usuario (1 a 0..1).

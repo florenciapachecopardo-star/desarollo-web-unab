@@ -10,7 +10,7 @@ Une cada requisito del Caso 19 (R01 a R13, detalle en `docs/m1-servicios.md`) co
 | R02 El pedido se prepara solo después de confirmar el pago | `pago.html` | S16, S17, S14 (cola solo con pagados) | P06, C06, C07, C10 | Aprobada | E03, E04, E07, E10 |
 | R03 El cliente puede anular una compra indicando el motivo | `mis-pedidos.html` (botón "Anular") | S13 | E02 | Aprobada | E02 (estado ANULADO, motivo y `stock_devuelto: true`) |
 | R04 Las ventas web se asocian a la caja de un cajero virtual | No tiene pantalla (lo asigna orders) | S11 | E02 | Aprobada | E02 (`cajero_id` USR-0005) |
-| R05 Registro de clientes con sus datos y validación del correo | `registro.html`, `verificar.html` | S09 (no implementado) | — | Brecha | Registro solo en localStorage |
+| R05 Registro de clientes con sus datos y validación del correo | `registro.html`, `verificar.html` | S09, S09V, S10 | `test_clientes.py` (registro, duplicados, validación en servidor, perfil propio, acceso directo) | Aprobada (verificación del correo simulada, ver R11) | E07 |
 | R06 El registro lo puede hacer el cliente o el administrador | `registro.html` (solo el cliente, local) | — | — | Brecha | — |
 | R07 Administrar la disponibilidad (stock) de cada producto | `index.html`, `producto.html` (lectura); administración solo por API (panel interno no está en la U2) | S01, S03, S04 | P01, P03, C11 | Aprobada | E01, E07, E10 |
 | R08 Boleta digital por cada venta, enviada al correo | `boleta.html` | S12, S16 | E03, E04 | Aprobada en parte: boleta numerada con neto e IVA; sin envío por correo | E03, E04 |

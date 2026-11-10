@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -20,6 +21,7 @@ INVENTORY_URL = os.getenv("INVENTORY_URL", "http://inventory:8000")
 ORDERS_URL = os.getenv("ORDERS_URL", "http://orders:8000")
 PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments:8000")
 GRAPHQL_URL = os.getenv("GRAPHQL_URL", "http://graphql-gateway:8000")
+CLIENTS_URL = os.getenv("CLIENTS_URL", "http://clients:8000")
 UPSTREAM_TIMEOUT = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "5"))
 VAULT_CACHE_SECONDS = float(os.getenv("VAULT_CACHE_SECONDS", "60"))
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
@@ -69,6 +71,7 @@ SERVICIOS = {
     "orders": ServiceTarget(ORDERS_URL, "orders_shared_secret"),
     "payments": ServiceTarget(PAYMENTS_URL, "payments_shared_secret"),
     "graphql": ServiceTarget(GRAPHQL_URL, "graphql_shared_secret"),
+    "clients": ServiceTarget(CLIENTS_URL, "clients_shared_secret"),
 }
 
 RUTAS = [
@@ -89,7 +92,40 @@ RUTAS = [
     RouteDefinition("S17", "POST", "/api/v1/pagos/aviso", "anonimo", (), "payments", "/pagos/aviso"),
     # GraphQL Gateway privado: solo con sesion; la autorizacion por recurso y campo la hace graphql-gateway
     RouteDefinition("S18", "POST", "/api/v1/graphql", "autenticado", (), "graphql", "/graphql"),
+    # clients: registro y verificacion son anonimos (con limite de solicitudes);
+    # el perfil propio sale de la identidad verificada, no de la URL
+    RouteDefinition("S09", "POST", "/api/v1/clientes", "anonimo", (), "clients", "/clientes"),
+    RouteDefinition("S09V", "POST", "/api/v1/clientes/{id}/verificar", "anonimo", (), "clients", "/clientes/{id}/verificar"),
+    RouteDefinition("S10", "GET", "/api/v1/clientes/me", "rol", ("CLIENTE",), "clients", "/clientes/me"),
 ]
+
+# ---------------------------------------------------------------------------
+# Limite de solicitudes (M5): ventana deslizante en memoria, por IP y por grupo.
+# Un solo gateway, asi que la memoria local alcanza; con varias replicas iria en Redis.
+# ---------------------------------------------------------------------------
+
+LIMITES = {
+    # grupo: (maximo de solicitudes, ventana en segundos)
+    "login": (int(os.getenv("RATE_LOGIN_POR_MINUTO", "20")), 60),
+    "registro": (int(os.getenv("RATE_REGISTRO_POR_MINUTO", "10")), 60),
+    # General: 200 req/s por IP, sobre el peak medido en E08 (k6 sale de una sola IP)
+    "api": (int(os.getenv("RATE_API_POR_MINUTO", "12000")), 60),
+}
+GRUPO_DE_RUTA = {"S09": "registro", "S09V": "registro"}
+_ventanas: dict = defaultdict(deque)
+
+
+def limitar(request: Request, grupo: str):
+    maximo, ventana = LIMITES[grupo]
+    ip = request.client.host if request.client else "desconocida"
+    marcas = _ventanas[(grupo, ip)]
+    ahora = time.monotonic()
+    while marcas and ahora - marcas[0] > ventana:
+        marcas.popleft()
+    if len(marcas) >= maximo:
+        log(SERVICE, level="warning", event="rate_limited", request_id=request_id_de(request), grupo=grupo)
+        raise ApiError(429, "RATE_LIMITED", "Demasiadas solicitudes, espera un momento e intenta de nuevo")
+    marcas.append(ahora)
 
 _PARAM_VALIDO = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -209,6 +245,7 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
 
 def registrar(ruta: RouteDefinition):
     async def handler(request: Request):
+        limitar(request, GRUPO_DE_RUTA.get(ruta.id, "api"))
         identidad = None
         if ruta.acceso != "anonimo":
             identidad = await obtener_identidad(request)
@@ -234,6 +271,7 @@ def health():
 
 @app.post("/api/v1/auth/login", name="S06")
 async def login(request: Request):
+    limitar(request, "login")
     try:
         body = await request.json()
     except ValueError:

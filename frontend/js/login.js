@@ -1,12 +1,10 @@
 // Pantalla de ingreso. Inicia sesión contra el servidor (S06 y S08) y redirige
 // según el perfil. Muestra las cuentas de prueba y permite completarlas con un clic.
 
+// Solo la cuenta de cliente de prueba (ficticia). Las cuentas del personal no se
+// publican en el front: están en el README para quien corrige.
 const CUENTAS_PRUEBA = [
-    { etiqueta: "Cliente", correo: "cliente@correo.cl", clave: "Cliente2026" },
-    { etiqueta: "Administrador", correo: "admin@chocomania.cl", clave: "Admin2026" },
-    { etiqueta: "Dueño", correo: "dueno@chocomania.cl", clave: "Dueno2026" },
-    { etiqueta: "Cajero virtual", correo: "cajero@chocomania.cl", clave: "Cajero2026" },
-    { etiqueta: "Encargado de despacho", correo: "despacho@chocomania.cl", clave: "Despacho2026" }
+    { etiqueta: "Cliente", correo: "cliente@correo.cl", clave: "Cliente2026" }
 ];
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -35,6 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Si llegó porque la sesión expiró, se avisa.
     if (new URLSearchParams(window.location.search).get("expirada")) {
         error.textContent = "Tu sesión expiró. Ingresa de nuevo para continuar.";
+    }
+    if (new URLSearchParams(window.location.search).get("verificado")) {
+        error.textContent = "¡Correo verificado! Ya puedes ingresar con tu cuenta.";
     }
 
     const boton = form.querySelector("button[type=submit]");

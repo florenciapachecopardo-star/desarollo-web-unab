@@ -2,7 +2,7 @@
 
 **Caso:** 19, Sistema de Ventas Online, adaptado a Chocomanía (chocolatería)
 **Fuente de la lista de servicios:** reparto de roles v2, sección 5.
-**Contratos confirmados con el código de `main` (3ba032e):** S01 a S08 y S11 a S19, comparados con `gateway.py`, `auth`, `inventory`, `orders`, `payments`, `graphql-gateway` y `frontend/js`. S09 y S10 no están implementados (recorte declarado, ver sección 5).
+**Contratos confirmados con el código de `main` (3ba032e):** S01 a S08 y S11 a S19, comparados con `gateway.py`, `auth`, `inventory`, `orders`, `payments`, `graphql-gateway` y `frontend/js`. S09, S09V y S10 se confirmaron con `backend/clients/main.py` (agregados el 9 de noviembre).
 **Datos de los ejemplos:** salen de `scripts/seed.py` y de las evidencias de `evidencias/u2/`.
 
 ## 1. Identificadores
@@ -57,8 +57,8 @@
 | S06 | R12 | F03 | Login: botón "Ingresar" | Iniciar sesión | `POST /api/v1/auth/login` | Anónimo | Transaccional | auth (vía gateway) | Implementado y conectado |
 | S07 | R12 | F03 | Menú: "Cerrar sesión" | Cerrar sesión | `POST /api/v1/auth/logout` | Autenticado | Transaccional | auth (vía gateway) | Implementado y conectado |
 | S08 | R12 | F03 | Todas: cargar el usuario actual | Saber quién es y qué rol tiene | `GET /api/v1/auth/me` | Autenticado | Consulta | auth (vía gateway) | Implementado y conectado |
-| S09 | R05, R06, R11 | F02 | Registro: botón "Crear cuenta" | Registrar un cliente | `POST /api/v1/clientes` | Anónimo | Transaccional | clients | **No implementado** (el registro sigue en localStorage) |
-| S10 | R05 | F04, F05 | Perfil y checkout: cargar datos | Ver el perfil propio | `GET /api/v1/clientes/me` | CLIENTE | Consulta | clients | **No implementado** |
+| S09 | R05, R06, R11 | F02 | Registro: botón "Crear cuenta" | Registrar un cliente | `POST /api/v1/clientes` | Anónimo | Transaccional | clients | Implementado (S09V `POST /api/v1/clientes/{id}/verificar` para el código) (el registro sigue en localStorage) |
+| S10 | R05 | F04, F05 | Perfil propio | Ver el perfil propio | `GET /api/v1/clientes/me` | CLIENTE | Consulta | clients | Implementado |
 | S11 | R01, R04 | F04 | Checkout: botón "Continuar al pago" | Crear un pedido, asociado a la caja del cajero virtual | `POST /api/v1/pedidos` | CLIENTE | Transaccional | orders | Implementado y conectado |
 | S12 | R01, R08 | F04 | Pago y Boleta: cargar el pedido | Ver el detalle de un pedido | `GET /api/v1/pedidos/{id}` | CLIENTE dueño, DESPACHO (pedidos pagados), ADMIN | Consulta | orders | Implementado y conectado |
 | S13 | R03 | F06 | Mis pedidos: botón "Anular" | Anular un pedido con motivo | `POST /api/v1/pedidos/{id}/anular` | CLIENTE dueño, ADMIN | Transaccional | orders | Implementado y conectado |
@@ -173,24 +173,40 @@
 { "user_id": "USR-0001", "roles": ["CLIENTE"], "nombre": "Valentina Soto" }
 ```
 
-### S09 `POST /api/v1/clientes` (no implementado)
+### S09 `POST /api/v1/clientes`
 
-Contrato diseñado para el servicio clients, que no se construyó en esta entrega. El registro (`registro.html` y `verificar.html`) sigue guardando en localStorage del navegador. Queda como brecha declarada (sección 5).
+Registro del cliente (`registro.html`). clients guarda el perfil y le pide a auth crear la credencial (rol CLIENTE, inactiva). La clave viaja una sola vez y auth guarda solo su hash bcrypt.
 
-- **Entrada prevista:** run, nombre, direccion, comuna, provincia, region, fecha_nacimiento, sexo, correo, telefono y clave (campos del Caso 19, RF5).
-- **Salida prevista:** 201 con el cliente creado y `correo_verificado: false`.
-- **Errores previstos:** 400 RUN con dígito verificador inválido, 409 RUN o correo ya registrado, 422 datos faltantes.
+- **Entrada:** run, nombre, direccion, comuna, provincia, region, nacimiento (fecha), sexo, correo, telefono y clave (mínimo 6). El servidor vuelve a validar todo: RUN con dígito verificador, correo, teléfono y fecha no futura.
+- **Salida:** 201 con `{id, verificado: false, codigo_simulado}`. `codigo_simulado` reemplaza al correo mientras no exista la mensajería (brecha R11).
+- **Errores:** 409 `CLIENT_EXISTS` (RUN o correo ya registrado, mismo mensaje para no revelar cuál), 422 datos inválidos, 429 `RATE_LIMITED`, 502 si auth no responde.
 
 ```json
-{ "run": "12.345.678-5", "nombre": "Valentina Soto", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "provincia": "Santiago", "region": "Región Metropolitana de Santiago", "fecha_nacimiento": "1999-04-12", "sexo": "F", "correo": "cliente@correo.cl", "telefono": "+56912345678", "clave": "Cliente2026" }
+{ "run": "12.345.678-5", "nombre": "Valentina Soto", "direccion": "Av. Providencia 1234", "comuna": "Providencia", "provincia": "Santiago", "region": "Región Metropolitana de Santiago", "nacimiento": "1999-04-12", "sexo": "Femenino", "correo": "nueva@correo.cl", "telefono": "+56912345678", "clave": "ClaveFicticia1" }
 ```
 
-### S10 `GET /api/v1/clientes/me` (no implementado)
+```json
+{ "id": "USR-3FA2B91C", "verificado": false, "codigo_simulado": "482913" }
+```
 
-Contrato diseñado para clients, que no se construyó. El checkout pide la dirección de despacho en el mismo formulario (va dentro de S11).
+### S09V `POST /api/v1/clientes/{id}/verificar`
 
-- **Salida prevista:** 200 con el perfil propio y el RUN enmascarado (`**.***.678-5`).
-- **Errores previstos:** 401, 403 si el rol no es CLIENTE.
+Verificación del correo (`verificar.html`). Si el código coincide con su hash, clients marca el perfil y auth activa la credencial. Antes de esto el login responde 401.
+
+- **Entrada:** `{ "codigo": "482913" }` (6 dígitos).
+- **Salida:** 200 `{ "id": "USR-3FA2B91C", "verificado": true }`.
+- **Errores:** 400 `INVALID_CODE` (código malo, cuenta inexistente o ya verificada: mismo mensaje), 422, 429.
+
+### S10 `GET /api/v1/clientes/me`
+
+Perfil propio. El id sale de la identidad que pone el gateway, nunca de la URL, así que no hay forma de pedir el perfil de otro.
+
+- **Salida:** 200 con `{id, run (enmascarado), nombre, correo, telefono, direccion, comuna, provincia, region, verificado}`. No devuelve clave, código, fecha de nacimiento ni sexo (no los necesita ninguna pantalla).
+- **Errores:** 401 sin sesión, 403 si el rol no es CLIENTE, 404 si el usuario no tiene perfil.
+
+```json
+{ "id": "USR-0001", "run": "**.***.111-1", "nombre": "Valentina Soto", "correo": "cliente@correo.cl", "telefono": "+56911111111", "direccion": "Calle Ficticia 1", "comuna": "Providencia", "provincia": "Santiago", "region": "Region Metropolitana de Santiago", "verificado": true }
+```
 
 ### S11 `POST /api/v1/pedidos`
 
@@ -369,7 +385,7 @@ Con inventory caído (error parcial, resumido):
 | R02 | **Cubierto.** El pedido pasa a PAGADO solo cuando payments lo confirma, y solo los pagados entran a la cola de despacho | S14, S16, S17 |
 | R03 | **Cubierto.** Anulación con motivo, sin borrar el registro y con devolución de stock | S13 |
 | R04 | **Cubierto.** orders asigna el `cajero_id` USR-0005 (cajero virtual) a cada pedido web | S11 |
-| R05 | **Brecha declarada.** El registro existe en el front pero guarda en localStorage; no hay servicio clients | S09 (no implementado), informe |
+| R05 | Registro con RUN validado y verificación del correo (simulada, sin mensajería) en el servicio clients | S09, S09V, S10 |
 | R06 | **Brecha declarada.** No hay registro por el administrador | Informe |
 | R07 | **Cubierto** en el backend; sin pantalla (el panel interno no está en la U2) | S01, S03, S04 |
 | R08 | **Parcial.** Se emite una boleta numerada con neto e IVA (19 %) al pagar y se ve en `boleta.html`; no se envía por correo | S12, S16, informe |
@@ -384,7 +400,7 @@ Con inventory caído (error parcial, resumido):
 | Servicio | Antes | Ahora (código de `main`) |
 |---|---|---|
 | S02 | Lo usaba la ficha del producto | El front no lo llama: la ficha usa los datos de S01 |
-| S09, S10 | Por confirmar con el PR del servicio clients | No implementados (recorte) |
+| S09, S09V, S10 | Confirmados con `backend/clients/main.py` y `tests/api/test_clientes.py` | Implementados |
 | S11 | `direccion_despacho` como texto; respuesta sin `cliente_id`, `creado_en` ni `historial` | `despacho { direccion, comuna, telefono }`; respuesta completa; errores 400 `IDEMPOTENCY_KEY_REQUIRED`, 400 producto repetido, 404 `PRODUCT_NOT_FOUND`, 409 `STOCK_INSUFICIENTE` y 409 `IDEMPOTENCY_CONFLICT` |
 | S12 | Flujo F05, solo dueño y ADMIN; respuesta resumida con `fecha` | Flujo F04 (lo usan Pago y Boleta; Mis pedidos usa S18); también DESPACHO (pedidos pagados); trae `boleta` y `historial` |
 | S14 | Respuesta `{ pedidos }` con `fecha_pago` | `{ pedidos, pagina, total }` con el pedido completo, paginado y ordenado por `creado_en` |

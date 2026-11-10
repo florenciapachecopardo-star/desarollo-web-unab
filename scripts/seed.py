@@ -19,6 +19,17 @@ from pymongo import MongoClient
 
 MONGO_URL = os.environ["MONGO_URL"]
 
+PERFILES_CLIENTES = [
+    {"_id": "USR-0001", "run": "11.111.111-1", "nombre": "Valentina Soto", "correo": "cliente@correo.cl",
+     "telefono": "+56911111111", "direccion": "Calle Ficticia 1", "region": "Region Metropolitana de Santiago",
+     "provincia": "Santiago", "comuna": "Providencia", "nacimiento": "1999-05-10", "sexo": "Femenino",
+     "verificado": True},
+    {"_id": "USR-0002", "run": "22.222.222-2", "nombre": "Diego Rojas", "correo": "diego@correo.cl",
+     "telefono": "+56922222222", "direccion": "Pasaje Inventado 22", "region": "Region Metropolitana de Santiago",
+     "provincia": "Santiago", "comuna": "Nunoa", "nacimiento": "1998-11-02", "sexo": "Masculino",
+     "verificado": True},
+]
+
 USUARIOS = [
     # _id,        correo,                   clave,          nombre,                   roles
     ("USR-0001", "cliente@correo.cl",      "Cliente2026",  "Valentina Soto",         ["CLIENTE"]),   # cliente1
@@ -98,6 +109,7 @@ def main():
     inventory_db = cliente["inventory"]
     orders_db = cliente["orders"]
     payments_db = cliente["payments"]
+    clients_db = cliente["clients"]
 
     if reset:
         auth_db["usuarios"].delete_many({})
@@ -107,7 +119,8 @@ def main():
         orders_db["contadores"].delete_many({})
         payments_db["pagos"].delete_many({})
         payments_db["contadores"].delete_many({})
-        print("reset: usuarios, sesiones, productos, pedidos y pagos borrados")
+        clients_db["clientes"].delete_many({})
+        print("reset: usuarios, sesiones, clientes, productos, pedidos y pagos borrados")
 
     for _id, correo, clave, nombre, roles in USUARIOS:
         auth_db["usuarios"].replace_one(
@@ -123,6 +136,11 @@ def main():
             upsert=True,
         )
     print(f"seed: {len(USUARIOS)} usuarios (claves guardadas solo como hash bcrypt)")
+
+    # Perfiles del servicio clients para los dos clientes de prueba (RUN ficticios validos)
+    for perfil in PERFILES_CLIENTES:
+        clients_db["clientes"].replace_one({"_id": perfil["_id"]}, perfil, upsert=True)
+    print(f"seed: {len(PERFILES_CLIENTES)} perfiles de cliente")
 
     for _id, nombre, categoria, descripcion, precio, stock, imagen in PRODUCTOS:
         inventory_db["productos"].replace_one(

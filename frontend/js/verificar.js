@@ -1,49 +1,47 @@
-// Verificación de correo (simulada). Muestra el código que "llegó" y activa la
-// cuenta si coincide. Sin verificar, el cliente no puede comprar.
+// Verificación de correo (S09V). El código lo genera el servidor; como no hay
+// servicio de mensajería, la pantalla muestra el "correo" que habría llegado.
+// Hasta verificar, la cuenta queda inactiva en auth y no puede iniciar sesión.
 
 document.addEventListener("DOMContentLoaded", () => {
     const id = new URLSearchParams(window.location.search).get("id");
-    const cliente = obtenerClientes().find((cli) => cli.id === Number(id));
     const error = document.getElementById("error");
     const form = document.getElementById("form-verificar");
+    const codigoSimulado = sessionStorage.getItem("choco:codigo-simulado");
 
-    if (!cliente) {
+    if (!id) {
         error.textContent = "No encontramos la cuenta.";
         form.hidden = true;
         return;
     }
 
-    if (cliente.verificado) {
-        document.querySelector(".tarjeta-form__intro").textContent = "Esta cuenta ya está verificada.";
+    if (codigoSimulado) {
+        document.getElementById("codigo-mostrado").textContent = codigoSimulado;
+    } else {
         document.querySelector(".correo-simulado").hidden = true;
-        form.hidden = true;
-        const enlace = document.createElement("a");
-        enlace.className = "boton";
-        enlace.href = "login.html";
-        enlace.textContent = "Ir a ingresar";
-        document.querySelector(".tarjeta-form").appendChild(enlace);
-        return;
     }
 
-    document.getElementById("codigo-mostrado").textContent = cliente.codigo;
+    const boton = form.querySelector("button[type=submit]");
 
-    form.addEventListener("submit", (evento) => {
+    form.addEventListener("submit", async (evento) => {
         evento.preventDefault();
         error.textContent = "";
 
         const codigo = form.codigo.value.trim();
-        if (!codigo) {
-            error.textContent = "Escribe el código.";
+        if (!/^[0-9]{6}$/.test(codigo)) {
+            error.textContent = "Escribe el código de 6 dígitos.";
             return;
         }
 
-        const resultado = verificarCorreo(cliente.id, codigo);
+        if (boton) boton.disabled = true;
+        const resultado = await verificarCorreoApi(id, codigo);
+        if (boton) boton.disabled = false;
+
         if (!resultado.ok) {
-            error.textContent = resultado.mensaje;
+            escribirError(error, resultado);
             return;
         }
 
-        alert("¡Correo verificado! Ya puedes ingresar.");
-        window.location.href = "login.html";
+        sessionStorage.removeItem("choco:codigo-simulado");
+        window.location.href = "login.html?verificado=1";
     });
 });
