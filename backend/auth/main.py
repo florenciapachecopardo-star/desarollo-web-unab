@@ -8,6 +8,7 @@ import bcrypt
 from fastapi import Depends, FastAPI, Header
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from observabilidad import ApiError, instalar, log
 
@@ -22,6 +23,8 @@ def requerida(nombre: str) -> str:
 
 
 AUTH_INTROSPECTION_SECRET = requerida("AUTH_INTROSPECTION_SECRET")
+# Secreto propio de clients: solo puede crear, activar o revertir credenciales de CLIENTE
+CLIENTS_AUTH_SECRET = requerida("CLIENTS_AUTH_SECRET")
 MONGO_URL = requerida("MONGO_URL")
 MONGO_DB = os.getenv("MONGO_DB", "auth")
 AUTH_TOKEN_TTL = int(os.getenv("AUTH_TOKEN_TTL", "900"))  # segundos
@@ -66,6 +69,17 @@ def huella(token: str) -> str:
 def verify_gateway(x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, AUTH_INTROSPECTION_SECRET):
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+
+
+def verify_clients(x_service_secret: str = Header(default="")):
+    if not secrets.compare_digest(x_service_secret, CLIENTS_AUTH_SECRET):
+        raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada")
+
+
+class NuevoUsuarioRequest(BaseModel):
+    correo: str = Field(min_length=5, max_length=120)
+    clave: str = Field(min_length=6, max_length=128)
+    nombre: str = Field(min_length=2, max_length=80)
 
 
 @app.get("/health")
@@ -117,4 +131,41 @@ async def introspect(datos: TokenRequest):
 @app.post("/logout", dependencies=[Depends(verify_gateway)])
 async def logout(datos: TokenRequest):
     await sesiones.delete_one({"_id": huella(datos.token)})
+    return {"status": "OK"}
+
+
+# ---------------------------------------------------------------------------
+# Rutas internas para clients (S09). No estan en la lista blanca del gateway.
+# El rol siempre es CLIENTE: clients no puede crear personal ni administradores.
+# ---------------------------------------------------------------------------
+
+@app.post("/usuarios", status_code=201, dependencies=[Depends(verify_clients)])
+async def crear_usuario(datos: NuevoUsuarioRequest):
+    user_id = f"USR-{secrets.token_hex(4).upper()}"
+    try:
+        await usuarios.insert_one({
+            "_id": user_id,
+            "correo": datos.correo.strip().lower(),
+            "nombre": datos.nombre,
+            "password_hash": bcrypt.hashpw(datos.clave.encode(), bcrypt.gensalt(rounds=12)).decode(),
+            "roles": ["CLIENTE"],
+            "activo": False,  # se activa al verificar el correo
+        })
+    except DuplicateKeyError:
+        raise ApiError(409, "USER_EXISTS", "El correo ya esta registrado")
+    return {"user_id": user_id}
+
+
+@app.post("/usuarios/{user_id}/activar", dependencies=[Depends(verify_clients)])
+async def activar_usuario(user_id: str):
+    r = await usuarios.update_one({"_id": user_id, "roles": ["CLIENTE"]}, {"$set": {"activo": True}})
+    if r.matched_count == 0:
+        raise ApiError(404, "USER_NOT_FOUND", "Usuario no encontrado")
+    return {"status": "OK"}
+
+
+@app.delete("/usuarios/{user_id}", dependencies=[Depends(verify_clients)])
+async def revertir_usuario(user_id: str):
+    """Solo borra credenciales de CLIENTE aun inactivas (reversion de un registro fallido)."""
+    await usuarios.delete_one({"_id": user_id, "roles": ["CLIENTE"], "activo": False})
     return {"status": "OK"}

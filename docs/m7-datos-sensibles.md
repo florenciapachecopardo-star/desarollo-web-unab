@@ -2,7 +2,7 @@
 
 **Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Las 6 pruebas de seguridad (sección 7) se ejecutaron el 08-11-2026 con pytest y pasaron todas (E07).
 
-**Cambio respecto del borrador:** el servicio clients no se implementó (S09 y S10). Por eso RUN, fecha de nacimiento y sexo **no llegan al backend**, y la dirección y el teléfono solo existen como copia de despacho dentro del pedido. La columna "Estado en la U2" dice qué está construido y qué es diseño.
+**Actualización del 9 de noviembre:** el servicio clients quedó implementado (S09, S09V y S10). RUN, dirección, teléfono, fecha de nacimiento y sexo se guardan en la base `clients`; la clave la recibe auth y guarda solo su hash bcrypt. S10 devuelve solo lo que el front necesita (sin fecha de nacimiento ni sexo). Las filas que digan "clients" deben leerse como implementadas.
 
 ## 1. Niveles de clasificación
 
@@ -18,13 +18,13 @@
 
 | Dato | Finalidad | Clasificación | Custodio | Roles que acceden | Protección | Retención | Estado en la U2 |
 |---|---|---|---|---|---|---|---|
-| RUN | Identificar al cliente (RF5) y emitir la boleta | Restringido | clients (diseño) | CLIENTE (el suyo), ADMIN | Enmascarado (`**.***.678-5`), único, validado con dígito verificador, nunca en logs | Mientras la cuenta esté activa | **No implementado en el backend.** El registro local del front lo guarda en localStorage (brecha) |
+| RUN | Identificar al cliente (RF5) y emitir la boleta | Restringido | clients | CLIENTE (el suyo), ADMIN | Enmascarado (`**.***.678-5`), único, validado con dígito verificador, nunca en logs | Mientras la cuenta esté activa | Implementado en clients (S09): único, validado con dígito verificador también en el servidor; S10 lo devuelve enmascarado |
 | Nombre | Saludo, despacho y boleta | Personal | auth (usuarios) | El propio usuario | Se devuelve solo en S08 (`/me`) al dueño de la sesión; los logs usan el ID | Mientras la cuenta esté activa | Implementado. La cola de despacho no lo muestra: solo trae `cliente_id` |
 | Correo | Inicio de sesión y contacto | Personal | auth | El propio usuario | Único; nunca en logs; la respuesta del login es igual si el correo no existe o la clave es incorrecta | Mientras la cuenta esté activa | Implementado |
 | Dirección y comuna de despacho | Entregar el pedido | Personal | orders (copia dentro del pedido) | CLIENTE (la suya), DESPACHO (pedidos pagados), ADMIN | No aparece en logs ni en el reporte de ventas; DESPACHO no ve pedidos sin pagar | Igual que el pedido | Implementado en S11 (`despacho`) |
 | Teléfono de despacho | Contacto para la entrega | Personal | orders (copia dentro del pedido, opcional) | CLIENTE (el suyo), DESPACHO (pedidos pagados), ADMIN | No aparece en logs; GraphQL no lo expone (Despacho solo tiene dirección y comuna) | Igual que el pedido | Implementado |
-| Fecha de nacimiento y sexo | Los pide el Caso 19 (RF5) | Restringido | clients (diseño) | CLIENTE (los suyos), ADMIN | No se usan en ninguna pantalla ni servicio | Mientras la cuenta esté activa | **No implementado en el backend**; solo en el registro local (brecha) |
-| Contraseña | Autenticación (RF12) | Secreto | auth | Nadie | Hash bcrypt costo 12; nunca en logs, respuestas ni capturas (`check.py` no muestra el hash) | Se reemplaza al cambiarla | Implementado para las cuentas del seed. **El registro local guarda la clave en texto plano en localStorage** (brecha) |
+| Fecha de nacimiento y sexo | Los pide el Caso 19 (RF5) | Restringido | clients | CLIENTE (los suyos), ADMIN | No se usan en ninguna pantalla ni servicio | Mientras la cuenta esté activa | Implementado: se guardan en clients y ningún servicio los devuelve |
+| Contraseña | Autenticación (RF12) | Secreto | auth | Nadie | Hash bcrypt costo 12; nunca en logs, respuestas ni capturas (`check.py` no muestra el hash) | Se reemplaza al cambiarla | Implementado para el seed y para el registro (S09 la manda a auth, que guarda solo el hash). El front ya no guarda claves |
 | Sesión (cookie) | Mantener la sesión | Secreto | auth (guarda solo el hash SHA-256 del token) y gateway (pone la cookie) | El navegador del usuario | Cookie `session_token` `httponly`, `samesite=lax`, TTL de 900 s con índice TTL en Mongo, invalidada en el logout | Hasta que expira o se cierra | Implementado. `secure` queda en `false` por defecto porque el entorno local usa HTTP |
 | Pedidos y líneas | Compra, despacho y reporte | Personal | orders | CLIENTE (los suyos), DESPACHO (pagados), ADMIN, DUENO (solo totales en S19) | Propiedad revisada en orders con la identidad del gateway; pedido ajeno = 404 | A confirmar (plazo tributario) | Implementado |
 | Boleta (número, neto, IVA, total) | Comprobante de la venta (RF8) | Personal | orders | Quien puede ver el pedido | Igual que el pedido; la numera el servidor | A confirmar (plazo tributario) | Implementada (R08 parcial: sin envío por correo) |
@@ -76,7 +76,7 @@ Detalle de cada una en `docs/protocolo-pruebas.md` y código en `tests/api/test_
 
 | Riesgo | Situación | Tratamiento |
 |---|---|---|
-| Registro local con datos personales y clave en texto plano en localStorage | El registro (`registro.js`) y el login de cuentas locales (`cuentas.js`) no usan el backend | Brecha declarada; se resuelve con clients (S09 y S10) en la U3 |
+| ~~Registro local con datos personales y clave en texto plano en localStorage~~ **Resuelto (INC05):** el registro va a clients y auth; el front ya no guarda cuentas y borra las que hubieran quedado de versiones anteriores | — | Brecha declarada; se resuelve con clients (S09 y S10) en la U3 |
 | Cuentas de prueba visibles en el login | `login.html` muestra correos y claves de prueba, incluida la de ADMIN | Son ficticias y solo para la demo; se quitan antes de cualquier despliegue real |
 | Mongo con el usuario raíz en todos los servicios | Un servicio comprometido podría leer las bases de los demás | Brecha declarada (M6); en la U3, un usuario por base con permisos mínimos |
 | Vault en modo dev y solo para el gateway | Los demás servicios reciben sus secretos por variables de entorno | Brecha declarada (M6) |

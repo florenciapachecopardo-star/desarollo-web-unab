@@ -41,7 +41,7 @@ En el código, AuthenticationPolicy, AuthorizationPolicy y SecretProvider son **
 | Por rol | S03 a S05 (ADMIN), S11 y S16 (CLIENTE), S14 y S15 (DESPACHO o ADMIN), S19 (DUENO o ADMIN) | Sesión vigente y rol permitido. El servicio vuelve a revisar el rol |
 | Front estático | `GET /`, `/*.html`, `/js/*`, `/css/*`, `/img/*` | Nada: son archivos públicos. Solo se sirven archivos de la carpeta `frontend/` |
 | Internas (no expuestas) | `/interno/*` de inventory y orders, `/introspect` y `/logout` de auth, `/graphql` de graphql-gateway, `/health` de cada servicio | No están en la lista blanca: desde fuera responden 404 |
-| No implementadas | S09, S10 (clients) | Recorte declarado: el registro y el perfil quedan en el front |
+| Anónimas con límite estricto | S09, S09V (clients) y S06 (login) | Límite por IP en el gateway (10 y 20 por minuto) contra registros masivos y fuerza bruta; 429 `RATE_LIMITED` |
 
 ## 4. Fronteras de confianza
 

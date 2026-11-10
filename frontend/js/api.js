@@ -73,7 +73,11 @@ const MENSAJES_ERROR = {
     STOCK_INSUFICIENTE: null, // el mensaje del servidor ya dice qué producto falta
     UPSTREAM_UNAVAILABLE: "Un servicio no está disponible en este momento. Intenta en unos minutos.",
     UPSTREAM_TIMEOUT: "Un servicio tardó demasiado en responder. Intenta en unos minutos.",
-    SECRETS_UNAVAILABLE: "El servicio no está disponible en este momento. Intenta en unos minutos."
+    SECRETS_UNAVAILABLE: "El servicio no está disponible en este momento. Intenta en unos minutos.",
+    CLIENT_EXISTS: "Ya hay una cuenta con ese RUN o correo.",
+    INVALID_CODE: "El código no coincide o la cuenta ya fue verificada.",
+    RATE_LIMITED: "Hiciste demasiados intentos. Espera un minuto e intenta de nuevo.",
+    VALIDATION_ERROR: "Algún dato no es válido. Revisa el formulario."
 };
 
 function textoError(resultado) {

@@ -1,7 +1,7 @@
 // Capa de datos de Chocomanía.
 // Desde el PR G, el catálogo, el login, los pedidos y los pagos vienen del servidor (js/api.js).
 // Aquí queda: la caché de lectura del catálogo y los datos locales de las pantallas que
-// todavía no están conectadas (registro de clientes y panel interno, declaradas como recorte).
+// todavía no están conectadas (panel interno, declarado como recorte).
 
 const CLAVE_PRODUCTOS = "choco:productos";
 const CLAVE_CLIENTES = "choco:clientes";
@@ -24,18 +24,8 @@ const PRODUCTOS_INICIALES = [
     { id: 5, nombre: "Trufas de chocolate", categoria: "trufas", descripcion: "Trufas artesanales con cobertura de chocolate", precio: 5490, disponible: true, imagen: "img/trufas-de-chocolate.jpg" }
 ];
 
-// Un usuario por cada perfil del caso (administrador, dueño, cajero, despacho).
-const USUARIOS_INICIALES = [
-    { id: 1, nombre: "Administrador", correo: "admin@chocomania.cl", clave: "Admin2026", perfil: "ADMIN" },
-    { id: 2, nombre: "Dueña Chocomanía", correo: "dueno@chocomania.cl", clave: "Dueno2026", perfil: "DUENO" },
-    { id: 3, nombre: "Cajero virtual", correo: "cajero@chocomania.cl", clave: "Cajero2026", perfil: "CAJERO" },
-    { id: 4, nombre: "Encargado de despacho", correo: "despacho@chocomania.cl", clave: "Despacho2026", perfil: "DESPACHO" }
-];
-
-const CLIENTES_INICIALES = [
-    { id: 1, run: "12.345.678-5", nombre: "Florencia Pacheco", direccion: "Av. Providencia 1234", comuna: "Providencia", provincia: "Santiago", region: "Región Metropolitana de Santiago", nacimiento: "1999-04-12", sexo: "F", correo: "cliente@correo.cl", telefono: "+56912345678", clave: "Cliente2026", verificado: true },
-    { id: 2, run: "9.876.543-3", nombre: "Diego Rojas", direccion: "Los Leones 55", comuna: "Ñuñoa", provincia: "Santiago", region: "Región Metropolitana de Santiago", nacimiento: "1995-08-30", sexo: "M", correo: "diego@correo.cl", telefono: "+56987654321", clave: "Diego2026", verificado: true }
-];
+// Las cuentas (clientes y personal) viven solo en el servidor: credenciales en auth
+// (hash bcrypt) y perfiles en clients. El navegador no guarda claves ni datos de cuentas.
 
 // Pedidos de ejemplo, para que el reporte de ventas no aparezca vacío.
 function pedidosIniciales() {
@@ -75,13 +65,14 @@ function guardar(clave, valor) {
 
 function cargarDatosDeEjemplo() {
     guardar(CLAVE_PRODUCTOS, PRODUCTOS_INICIALES);
-    guardar(CLAVE_USUARIOS, USUARIOS_INICIALES);
-    guardar(CLAVE_CLIENTES, CLIENTES_INICIALES);
     guardar(CLAVE_PEDIDOS, pedidosIniciales());
     guardar(CLAVE_SEMILLA, "1");
 }
 
 function inicializarDatos() {
+    // Limpia cuentas guardadas por versiones anteriores del front (tenian claves en texto plano)
+    localStorage.removeItem(CLAVE_CLIENTES);
+    localStorage.removeItem(CLAVE_USUARIOS);
     if (!localStorage.getItem(CLAVE_SEMILLA)) {
         cargarDatosDeEjemplo();
     }
@@ -109,24 +100,6 @@ function buscarProducto(id) {
 function nombreCategoria(id) {
     const categoria = CATEGORIAS.find((cat) => cat.id === id);
     return categoria ? categoria.nombre : id;
-}
-
-// --- Clientes ---
-function obtenerClientes() {
-    return leer(CLAVE_CLIENTES, []);
-}
-
-function guardarClientes(clientes) {
-    guardar(CLAVE_CLIENTES, clientes);
-}
-
-// --- Usuarios (personal) ---
-function obtenerUsuarios() {
-    return leer(CLAVE_USUARIOS, []);
-}
-
-function guardarUsuarios(usuarios) {
-    guardar(CLAVE_USUARIOS, usuarios);
 }
 
 // --- Pedidos ---

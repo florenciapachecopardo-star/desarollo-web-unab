@@ -18,7 +18,7 @@ Hay un único API Gateway (`gateway`, puerto 8000). Es el único contenedor en l
 | Correlación | `X-Request-ID` (8 a 64 caracteres válidos se reutiliza; si no, se genera) en la respuesta y en los logs |
 | Secreto por servicio | Cada servicio interno exige `X-Gateway-Secret` con el valor de su propia integración |
 | Plazos | 5 s hacia los servicios (`UPSTREAM_TIMEOUT_SECONDS`): 504 si no responden, 502 si no están disponibles |
-| Límite de solicitudes | No implementado en la U2 (pasa a la Etapa 4) |
+| Límite de solicitudes | Ventana deslizante por IP en el gateway: login 20/min, registro y verificación 10/min, resto 12.000/min. Responde 429 `RATE_LIMITED` (prueba `test_zz_limite.py`) |
 
 ## 3. Matriz de rutas
 
@@ -32,8 +32,9 @@ Hay un único API Gateway (`gateway`, puerto 8000). Es el único contenedor en l
 | S06 | gateway | POST | `/api/v1/auth/login` | Anónimo | auth `/login` | Misma respuesta si el correo no existe o la clave está mal; deja la cookie | Ninguna (auth `/login` solo es alcanzable desde la red privada) |
 | S07 | gateway | POST | `/api/v1/auth/logout` | Con o sin sesión | auth `/logout` | Borra la sesión en auth y la cookie | `secret/gateway#auth_introspection_secret` |
 | S08 | gateway | GET | `/api/v1/auth/me` | Autenticado | auth `/introspect` | No reenvía el token a otros servicios | `secret/gateway#auth_introspection_secret` |
-| S09 | gateway | POST | `/api/v1/clientes` | Anónimo | clients | No implementado (recorte declarado) | — |
-| S10 | gateway | GET | `/api/v1/clientes/me` | CLIENTE | clients | No implementado (recorte declarado) | — |
+| S09 | gateway | POST | `/api/v1/clientes` | Anónimo | clients `/clientes` | Límite 10/min por IP; clients valida RUN (módulo 11), correo y teléfono; la clave va a auth y solo se guarda su hash | `secret/gateway#clients_shared_secret` |
+| S09V | gateway | POST | `/api/v1/clientes/{id}/verificar` | Anónimo | clients `/clientes/{id}/verificar` | ID validado; límite 10/min por IP; código guardado como hash SHA-256 | `secret/gateway#clients_shared_secret` |
+| S10 | gateway | GET | `/api/v1/clientes/me` | CLIENTE | clients `/clientes/me` | Identidad del gateway; devuelve solo los campos del perfil (sin clave, código ni fecha de nacimiento) | `secret/gateway#clients_shared_secret` |
 | S11 | gateway | POST | `/api/v1/pedidos` | CLIENTE | orders `/pedidos` | `Idempotency-Key` obligatorio; precio desde inventory | `secret/gateway#orders_shared_secret` |
 | S12 | gateway | GET | `/api/v1/pedidos/{id}` | Autenticado | orders `/pedidos/{id}` | Propiedad revisada en orders | `secret/gateway#orders_shared_secret` |
 | S13 | gateway | POST | `/api/v1/pedidos/{id}/anular` | Autenticado | orders `/pedidos/{id}/anular` | Propiedad y estado revisados en orders | `secret/gateway#orders_shared_secret` |
@@ -67,6 +68,8 @@ Solo se registran **referencias**, nunca valores. Los valores están en el archi
 | `secret/gateway#orders_shared_secret` (`GATEWAY_ORDERS_SECRET`) | Secreto compartido | `.env` → `vault-init` | gateway → orders | Que orders solo acepte solicitudes del gateway | Vault (lado gateway) y `.env` (lado orders) | S11 a S15 y S19 | Igual que el anterior |
 | `secret/gateway#payments_shared_secret` (`GATEWAY_PAYMENTS_SECRET`) | Secreto compartido | `.env` → `vault-init` | gateway → payments | Que payments solo acepte solicitudes del gateway | Vault (lado gateway) y `.env` (lado payments) | S16 y S17 | Igual que el anterior |
 | `secret/gateway#graphql_shared_secret` (`GATEWAY_GRAPHQL_SECRET`) | Secreto compartido | `.env` → `vault-init` | gateway → graphql-gateway | Que graphql-gateway solo acepte solicitudes del gateway | Vault (lado gateway) y `.env` (lado graphql-gateway) | S18 | Igual que el anterior |
+| `secret/gateway#clients_shared_secret` (`GATEWAY_CLIENTS_SECRET`) | Secreto compartido | `.env` → `vault-init` | gateway → clients | Que clients solo acepte solicitudes del gateway | Vault (lado gateway) y `.env` (lado clients) | S09, S09V y S10 | Cambiar en `.env`, recargar Vault y reiniciar clients |
+| `CLIENTS_AUTH_SECRET` | Secreto compartido | `.env` | clients → auth | Crear, activar o revertir credenciales | `.env` (no está en Vault) | Solo `/usuarios` de auth y siempre con rol CLIENTE: no puede crear personal ni administradores | Cambiar en `.env` y reiniciar clients y auth |
 | `GRAPHQL_ORDERS_SECRET` | Secreto compartido (solo lectura) | `.env` | graphql-gateway → orders | Leer pedidos | `.env` (no está en Vault) | `GET /pedidos` y `GET /pedidos/{id}` | Cambiar en `.env` y reiniciar graphql-gateway y orders |
 | `GRAPHQL_INVENTORY_SECRET` | Secreto compartido (solo lectura) | `.env` | graphql-gateway → inventory | Leer productos por lote | `.env` (no está en Vault) | `POST /interno/productos/lote` | Cambiar en `.env` y reiniciar graphql-gateway e inventory |
 | `ORDERS_INVENTORY_SECRET` | Secreto compartido | `.env` | orders → inventory | Reservar y devolver stock | `.env` (no está en Vault) | `/interno/reservas` y `/interno/devoluciones` | Cambiar en `.env` y reiniciar orders e inventory |
@@ -106,12 +109,12 @@ Valores que ya se dan por quemados (quedaron en el historial de git en semanas a
 | Logs | El gateway registra `secret_loaded` con los nombres de las claves, nunca los valores. Los logs no incluyen tokens, cookies, contraseñas ni correos |
 | Evidencias (`evidencias/u2/`) | Revisadas: sin secretos ni tokens; solo datos ficticios |
 | `backend/gateway/README.md` | Tenía las instrucciones de la Semana 8 con secretos de laboratorio quemados. **Borrado** en INCR-24. Siguen en el historial de git; eran valores de laboratorio que no se usan en el stack actual |
-| `frontend/js/login.js` | Muestra las cuentas de prueba del seed con sus claves, para el laboratorio. Son ficticias, pero incluyen ADMIN: no se pueden usar fuera del entorno local |
+| `frontend/js/login.js` | Solo muestra la cuenta de cliente de prueba (ficticia). Las cuentas del personal se sacaron del front y quedan solo en el README |
 
 ## 8. Brechas declaradas
 
 1. **Solo el gateway lee secretos desde Vault.** Los servicios internos reciben los suyos como variables de entorno desde `.env`, y los secretos entre servicios (`ORDERS_INVENTORY_SECRET`, `PAYMENTS_ORDERS_SECRET`, `PAYMENT_PROVIDER_SECRET`, `GRAPHQL_ORDERS_SECRET` y `GRAPHQL_INVENTORY_SECRET`) no están en Vault.
 2. **Una sola credencial de Mongo para todo.** Cada servicio usa su propia base (`auth`, `inventory`, `orders`, `payments`), pero todos se conectan con el usuario raíz, así que la separación no la hace cumplir la base de datos.
 3. **Vault en modo dev**, con datos en memoria y token raíz en `.env`. Sirve para el entorno local, no para producción.
-4. **Sin límite de solicitudes** en la U2.
+4. **Límite de solicitudes en memoria del gateway:** sirve para un solo gateway; con varias réplicas tendría que ir en un almacén compartido (por ejemplo Redis).
 5. **Cookie sin `secure`** en local (`COOKIE_SECURE=false`), porque no hay HTTPS.

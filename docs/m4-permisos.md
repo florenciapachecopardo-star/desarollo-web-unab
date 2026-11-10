@@ -23,8 +23,9 @@ Códigos: **✅** permitido, **401** sin sesión o sesión inválida, **403** ro
 | S06 | `POST /api/v1/auth/login` | auth | ✅ | — | — | — | — | — | Correo y clave correctos | auth (bcrypt) |
 | S07 | `POST /api/v1/auth/logout` | auth | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Sin sesión responde igual (no hay nada que cerrar) | Gateway y auth |
 | S08 | `GET /api/v1/auth/me` | auth | 401 | ✅ | ✅ | ✅ | ✅ | ✅ | Sesión vigente | Gateway (`/introspect` en auth) |
-| S09 | `POST /api/v1/clientes` | clients | No implementado | | | | | | Recorte declarado: el registro queda en el front | — |
-| S10 | `GET /api/v1/clientes/me` | clients | No implementado | | | | | | Recorte declarado: el perfil queda en el front | — |
+| S09 | `POST /api/v1/clientes` | clients | ✅ | — | — | — | — | — | Registro anónimo con límite de 10 por minuto por IP; RUN y correo únicos; la cuenta queda inactiva hasta verificar | Gateway (límite) y clients (validación); la credencial la crea auth con el secreto propio de clients |
+| S09V | `POST /api/v1/clientes/{id}/verificar` | clients | ✅ | — | — | — | — | — | Código de 6 dígitos correcto; mismo error si la cuenta no existe | Gateway (límite) y clients (hash del código) |
+| S10 | `GET /api/v1/clientes/me` | clients | 401 | Solo el suyo | 403 | 403 | 403 | 403 | El id sale de la sesión, no de la URL: no existe forma de pedir otro perfil | Gateway (rol) y clients (`cliente_autenticado`) |
 | S11 | `POST /api/v1/pedidos` | orders | 401 | ✅ | 403 | 403 | 403 | 403 | Solo CLIENTE, con `Idempotency-Key` | Gateway (rol) y orders (rol) |
 | S12 | `GET /api/v1/pedidos/{id}` | orders | 401 | Solo los suyos (ajeno 404) | ✅ todos | 404 | 404 | Solo pedidos vendidos (otros 404) | Propiedad del pedido | Gateway (sesión) y orders (`puede_ver`) |
 | S13 | `POST /api/v1/pedidos/{id}/anular` | orders | 401 | Solo los suyos (ajeno 404) | ✅ | 404 | 404 | 404 | Pedido en PENDIENTE_PAGO (si no, 409) y motivo obligatorio | Gateway (sesión) y orders (propiedad y estado) |

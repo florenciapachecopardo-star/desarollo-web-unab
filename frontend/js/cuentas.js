@@ -1,6 +1,7 @@
 // Clientes y personal: registro, validación de RUN, ingreso y sesión.
-// La sesión vive en localStorage. No hay servidor, así que la "validación del
-// correo" y el "cifrado de clave" son simulados (ver README).
+// La sesión real es una cookie httponly del servidor; en localStorage solo queda
+// el nombre y el perfil para pintar la interfaz. La verificación del correo es
+// simulada (no hay servicio de mensajería, ver README).
 
 const CLAVE_SESION = "choco:sesion";
 
@@ -55,80 +56,20 @@ function cerrarSesion() {
     localStorage.removeItem(CLAVE_SESION);
 }
 
-// Ingreso: primero busca en clientes, luego en personal.
-// Devuelve { ok, mensaje }.
-function iniciarSesion(correo, clave) {
-    const cliente = obtenerClientes().find((cli) => cli.correo.toLowerCase() === correo.toLowerCase());
-    if (cliente && cliente.clave === clave) {
-        if (!cliente.verificado) {
-            return { ok: false, mensaje: "Tu correo aún no está verificado.", verificarId: cliente.id };
-        }
-        guardarSesion({ tipo: "CLIENTE", perfil: "CLIENTE", id: cliente.id, nombre: cliente.nombre });
-        return { ok: true };
-    }
-
-    const usuario = obtenerUsuarios().find((usr) => usr.correo.toLowerCase() === correo.toLowerCase());
-    if (usuario && usuario.clave === clave) {
-        guardarSesion({ tipo: "PERSONAL", perfil: usuario.perfil, id: usuario.id, nombre: usuario.nombre });
-        return { ok: true };
-    }
-
-    return { ok: false, mensaje: "Correo o contraseña incorrectos." };
-}
-
 function guardarSesion(sesion) {
     localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion));
 }
 
 // --- Registro de clientes ---
-// Genera un código de 6 dígitos que simula el que llegaría al correo.
-function generarCodigo() {
-    return String(Math.floor(100000 + Math.random() * 900000));
+// El registro y la verificación van al servicio clients por el gateway (S09 y S09V).
+// La clave se manda una sola vez por la API y el servidor guarda solo su hash.
+async function registrarClienteApi(datos) {
+    return apiFetch("/api/v1/clientes", { method: "POST", body: datos });
 }
 
-// Registra un cliente nuevo. Recibe los datos ya leídos del formulario.
-// Devuelve { ok, mensaje, cliente }.
-function registrarCliente(datos) {
-    const clientes = obtenerClientes();
-
-    if (clientes.some((cli) => cli.correo.toLowerCase() === datos.correo.toLowerCase())) {
-        return { ok: false, mensaje: "Ya hay una cuenta con ese correo." };
-    }
-    if (clientes.some((cli) => limpiarRun(cli.run) === limpiarRun(datos.run))) {
-        return { ok: false, mensaje: "Ya hay una cuenta con ese RUN." };
-    }
-
-    const cliente = {
-        id: siguienteId(clientes),
-        run: formatearRun(datos.run),
-        nombre: datos.nombre,
-        direccion: datos.direccion,
-        comuna: datos.comuna,
-        provincia: datos.provincia,
-        region: datos.region,
-        nacimiento: datos.nacimiento,
-        sexo: datos.sexo,
-        correo: datos.correo,
-        telefono: datos.telefono,
-        clave: datos.clave,
-        verificado: datos.verificado === true,
-        codigo: datos.verificado === true ? "" : generarCodigo()
-    };
-
-    clientes.push(cliente);
-    guardarClientes(clientes);
-    return { ok: true, cliente };
-}
-
-// Marca un cliente como verificado si el código coincide.
-function verificarCorreo(idCliente, codigo) {
-    const clientes = obtenerClientes();
-    const cliente = clientes.find((cli) => cli.id === Number(idCliente));
-    if (!cliente) return { ok: false, mensaje: "No encontramos la cuenta." };
-    if (cliente.codigo !== codigo) return { ok: false, mensaje: "El código no coincide." };
-
-    cliente.verificado = true;
-    cliente.codigo = "";
-    guardarClientes(clientes);
-    return { ok: true, cliente };
+async function verificarCorreoApi(idCliente, codigo) {
+    return apiFetch("/api/v1/clientes/" + encodeURIComponent(idCliente) + "/verificar", {
+        method: "POST",
+        body: { codigo }
+    });
 }

@@ -48,6 +48,7 @@ services:
       GATEWAY_ORDERS_SECRET: ${GATEWAY_ORDERS_SECRET:?Falta GATEWAY_ORDERS_SECRET en .env}
       GATEWAY_PAYMENTS_SECRET: ${GATEWAY_PAYMENTS_SECRET:?Falta GATEWAY_PAYMENTS_SECRET en .env}
       GATEWAY_GRAPHQL_SECRET: ${GATEWAY_GRAPHQL_SECRET:?Falta GATEWAY_GRAPHQL_SECRET en .env}
+      GATEWAY_CLIENTS_SECRET: ${GATEWAY_CLIENTS_SECRET:?Falta GATEWAY_CLIENTS_SECRET en .env}
     networks: [privada]
     depends_on:
       vault:
@@ -72,6 +73,7 @@ services:
     image: chocomania-auth:dev
     environment:
       AUTH_INTROSPECTION_SECRET: ${AUTH_INTROSPECTION_SECRET}
+      CLIENTS_AUTH_SECRET: ${CLIENTS_AUTH_SECRET:?Falta CLIENTS_AUTH_SECRET en .env}
       MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
       AUTH_TOKEN_TTL: ${AUTH_TOKEN_TTL:-900}
     networks: [privada]
@@ -129,6 +131,8 @@ services:
       INVENTORY_URL: http://inventory:8000
       ORDERS_URL: http://orders:8000
       PAYMENTS_URL: http://payments:8000
+      CLIENTS_URL: http://clients:8000
+      AUTH_URL: http://auth:8000
     networks: [publica, privada]
     depends_on:
       gateway:
@@ -149,6 +153,24 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+
+  # Perfil de clientes (S09, S10). Las credenciales siguen en auth.
+  clients:
+    build: ./backend/clients
+    image: chocomania-clients:dev
+    environment:
+      INTERNAL_GATEWAY_SECRET: ${GATEWAY_CLIENTS_SECRET}
+      CLIENTS_AUTH_SECRET: ${CLIENTS_AUTH_SECRET}
+      AUTH_URL: http://auth:8000
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      UPSTREAM_TIMEOUT_SECONDS: ${ORDERS_UPSTREAM_TIMEOUT_SECONDS:-3}
+    networks: [privada]
+    depends_on:
+      mongo:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    healthcheck: *healthcheck-python
 
   inventory:
     build: ./backend/inventory
@@ -244,6 +266,7 @@ services:
       ORDERS_URL: http://orders:8000
       PAYMENTS_URL: http://payments:8000
       GRAPHQL_URL: http://graphql-gateway:8000
+      CLIENTS_URL: http://clients:8000
       FRONTEND_DIR: /frontend
       UPSTREAM_TIMEOUT_SECONDS: ${UPSTREAM_TIMEOUT_SECONDS:-5}
     networks: [publica, privada]
@@ -259,5 +282,7 @@ services:
       payments:
         condition: service_healthy
       graphql-gateway:
+        condition: service_healthy
+      clients:
         condition: service_healthy
     healthcheck: *healthcheck-python

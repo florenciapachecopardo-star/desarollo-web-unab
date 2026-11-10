@@ -31,7 +31,7 @@
 
 ## Resumen
 
-Chocomanía es la tienda online de una chocolatería pequeña. En esta entrega se construyó el backend detrás del front de la Entrega 1: un API Gateway como única puerta de entrada, cinco servicios internos en una red privada (auth, inventory, orders, payments y graphql-gateway), Vault para los secretos del gateway y MongoDB como base. El cliente puede comprar de punta a punta desde el navegador: ver el catálogo, iniciar sesión, crear el pedido, pagarlo, ver la boleta y revisar sus pedidos por GraphQL.
+Chocomanía es la tienda online de una chocolatería pequeña. En esta entrega se construyó el backend detrás del front de la Entrega 1: un API Gateway como única puerta de entrada, seis servicios internos en una red privada (auth, clients, inventory, orders, payments y graphql-gateway), Vault para los secretos del gateway y MongoDB como base. El cliente puede comprar de punta a punta desde el navegador: registrarse y verificar su correo, ver el catálogo, iniciar sesión, crear el pedido, pagarlo, ver la boleta y revisar sus pedidos por GraphQL.
 
 Lo que cruza todo el sistema:
 
@@ -47,13 +47,13 @@ Lo que cruza todo el sistema:
 
 13 requisitos (R01 a R13) tomados del Caso 19, 9 flujos (F01 a F09) y 19 servicios (S01 a S19). Cada servicio tiene su requisito, su flujo, la pantalla que lo usa, el acceso, la clasificación (consulta, transaccional, integración, agregación o analítica), el estado de implementación y un ejemplo JSON real tomado del seed o de las evidencias. Las reglas comunes cubren el formato único de error, la validación (422), la correlación, la identidad, el recurso ajeno (404), la idempotencia y qué pasa si un servicio cae.
 
-17 de los 19 servicios están implementados. S09 y S10 (servicio clients) quedan como brecha.
+Los 19 servicios están implementados, más S09V (verificación del correo). S09, S09V y S10 se agregaron el 9 de noviembre con el servicio clients.
 
 ## M2. Modelo del dominio
 
 **Documentos:** [`m2-dominio.md`](m2-dominio.md) y [`uml-dominio.drawio`](uml-dominio.drawio)
 
-Diagrama de clases con Usuario, Rol, Cliente, Producto, Pedido, LineaPedido, Boleta y Pago, sus multiplicidades (por ejemplo, Pedido y LineaPedido 1 a 1..* por composición, Pedido y Pago 1 a 0..*), 13 reglas del dominio (D01 a D13) y la máquina de estados del pedido. Confirmado con el código de orders y payments. Cliente queda marcado como no implementado en la U2.
+Diagrama de clases con Usuario, Rol, Cliente, Producto, Pedido, LineaPedido, Boleta y Pago, sus multiplicidades (por ejemplo, Pedido y LineaPedido 1 a 1..* por composición, Pedido y Pago 1 a 0..*), 13 reglas del dominio (D01 a D13) y la máquina de estados del pedido. Confirmado con el código de orders y payments. Cliente quedó implementado en el servicio clients (perfil con RUN único); las credenciales siguen en auth.
 
 ## M3. Matriz de sistemas y componentes
 
@@ -113,8 +113,9 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 | inventory | Catálogo, stock, reservas y devoluciones internas, lote para GraphQL | E01, E02, E05, E10 |
 | orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03, E10 |
 | payments | Pago con idempotencia, proveedor simulado (inmediato o aviso), reconciliación si orders cae | E03, E04 |
+| clients | Registro con RUN validado en el servidor, verificación del correo (simulada), perfil propio con RUN enmascarado; la credencial la crea auth con bcrypt | E07 (`test_clientes.py`) |
 | graphql-gateway | `misPedidos` y `pedido` con DataLoader, límites y errores parciales | E05, E06 |
-| front | Catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | E09 (escritorio, celular y error parcial) |
+| front | Registro, verificación, catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | E09 (escritorio, celular y error parcial) |
 
 ### Cómo verificarlo
 
@@ -124,11 +125,11 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 4. Abrir `http://localhost:8000`, iniciar sesión con `cliente@correo.cl` y comprar un producto.
 5. Copiar el `X-Request-ID` de cualquier respuesta y ejecutar `scripts/logs.sh <request_id>` para ver la traza en todos los servicios.
 6. Revisar la base con `docker compose run --rm check pedido PED-0003`.
-7. Correr las pruebas automáticas con `docker compose run --rm pruebas` (16 pruebas, E07) y la carga con `docker compose run --rm k6` (E08), cada una sobre la base reseteada.
+7. Correr las pruebas automáticas con `docker compose run --rm pruebas` (22 pruebas, E07; esperar 1 minuto si se repite) y la carga con `docker compose run --rm k6` (E08), cada una sobre la base reseteada.
 
 ### Lo que no está en la U2
 
-El servicio clients (registro y perfil), el panel interno (mantenedor, cola de despacho y reporte no tienen pantalla, aunque sus servicios funcionan), el envío de la boleta por correo, el límite de solicitudes y las pruebas con Playwright. Ver [Brechas declaradas](#brechas-declaradas).
+El panel interno (mantenedor, cola de despacho y reporte no tienen pantalla, aunque sus servicios funcionan), el envío de la boleta por correo y las pruebas con Playwright. Ver [Brechas declaradas](#brechas-declaradas).
 
 ### Historial
 
@@ -138,14 +139,13 @@ Cada cambio está en [`bitacora.md`](bitacora.md) (INCR-00 en adelante) y las fa
 
 **Documento:** [`matriz-requisitos.md`](matriz-requisitos.md)
 
-Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04, R07, R09, R12 y R13 tienen evidencia aprobada; R08 y R10 en parte (sin correo y sin mantenedor de usuarios y clientes); R05, R06 y R11 son brechas. Los servicios sin pantalla (productos como ADMIN, cola de despacho y reporte) se probaron por API (E10).
+Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R05, R07, R09, R12 y R13 tienen evidencia aprobada; R08 y R10 en parte (sin correo y sin mantenedor de usuarios y clientes); R06 y R11 siguen como brecha (registro por el administrador y mensajería real). Los servicios sin pantalla (productos como ADMIN, cola de despacho y reporte) se probaron por API (E10).
 
 ## Brechas declaradas
 
 | Brecha | Motivo | Módulo donde se declara |
 |---|---|---|
-| Servicio clients no implementado (S09, S10): el registro y el perfil siguen en localStorage, con la clave en texto plano (INC05) | Recorte por tiempo; se priorizó la compra completa | M1, M7 |
-| R06 (registro por el administrador) y R10 para usuarios y clientes | Dependen de clients | M1 |
+| R06 (registro hecho por el administrador) y R10 para usuarios y clientes | clients ya existe, pero falta la pantalla y la ruta de ADMIN | M1 |
 | Verificación del correo simulada, sin API de mensajería (R11) | Recorte acordado | M7 |
 | Boleta sin envío por correo (R08 parcial) | Sin servicio de mensajería | M1, M2 |
 | Panel interno sin pantallas: mantenedor de productos, cola de despacho y reporte de ventas solo por API | Recorte por tiempo | M1, M10 |
@@ -153,11 +153,10 @@ Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01
 | Solo el gateway lee secretos de Vault; Vault en modo dev | Entorno local | M6 |
 | Todos los servicios usan el usuario raíz de Mongo | Entorno local | M6, M7 |
 | Cookie sin `secure` en local | No hay HTTPS en local | M6, M7 |
-| Sin límite de solicitudes (rate limit) | Pasa a la Etapa 4 | M6 |
 | Sin pruebas con Playwright | Pasa a la U3; en la U2, evidencia manual | Protocolo de pruebas |
 | Stock descontado sin pedido si inventory responde después del plazo de orders | Requiere reservas con ID propio | M3 |
 | GraphQL: `stock` no lo puede ver nadie (las queries son solo de CLIENTE), lote máximo de 50 productos e introspección activa | Decisiones de alcance | M8 |
-| Cuentas de prueba con sus claves visibles en el login | Facilitan la demo; son ficticias | M7 |
+| Cuenta de cliente de prueba visible en el login (las del personal se sacaron del front) | Facilita la demo; es ficticia | M7 |
 | Solo se sometió a carga el catálogo; orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud, y gateway e inventory llegan cerca de un núcleo con 100 usuarios | Alcance de la medición | M9 |
 | DESPACHO se entera del estado de un pedido sin pagar al intentar moverlo (409 en vez de 404, INC07) | Encontrado al revisar E10 | Incidencias |
 

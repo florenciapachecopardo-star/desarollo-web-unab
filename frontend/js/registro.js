@@ -89,23 +89,24 @@ document.addEventListener("DOMContentLoaded", () => {
         return valido;
     }
 
-    form.addEventListener("submit", (evento) => {
+    const botonEnviar = form.querySelector("button[type=submit]");
+
+    form.addEventListener("submit", async (evento) => {
         evento.preventDefault();
         limpiarErrores();
 
         const datos = {
             run: form.run.value,
-            nombre: form.nombre.value,
-            direccion: form.direccion.value,
+            nombre: form.nombre.value.trim(),
+            direccion: form.direccion.value.trim(),
             region: form.region.value,
             provincia: form.provincia.value,
             comuna: form.comuna.value,
             nacimiento: form.nacimiento.value,
             sexo: form.sexo.value,
-            correo: form.correo.value,
-            telefono: form.telefono.value,
-            clave: form.clave.value,
-            verificado: false
+            correo: form.correo.value.trim(),
+            telefono: form.telefono.value.trim(),
+            clave: form.clave.value
         };
 
         if (!validar(datos)) {
@@ -113,12 +114,20 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const resultado = registrarCliente(datos);
+        // S09: el servidor vuelve a validar todo y guarda la clave solo como hash
+        if (botonEnviar) botonEnviar.disabled = true;
+        const resultado = await registrarClienteApi(datos);
+        if (botonEnviar) botonEnviar.disabled = false;
+        form.clave.value = "";
+
         if (!resultado.ok) {
-            errorGeneral.textContent = resultado.mensaje;
+            escribirError(errorGeneral, resultado);
             return;
         }
 
-        window.location.href = "verificar.html?id=" + resultado.cliente.id;
+        // Verificación simulada: el código que "llegaría" por correo se pasa a la
+        // página siguiente en sessionStorage (no en la URL) y se borra al usarlo.
+        sessionStorage.setItem("choco:codigo-simulado", resultado.data.codigo_simulado);
+        window.location.href = "verificar.html?id=" + encodeURIComponent(resultado.data.id);
     });
 });
