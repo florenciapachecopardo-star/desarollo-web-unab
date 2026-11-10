@@ -97,7 +97,7 @@ GraphQL Gateway privado (Strawberry) detrás del API Gateway, con las queries `m
 
 Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al catálogo por día en peak, menos de 25 solicitudes por segundo. Umbrales fijados antes de medir (p95 del catálogo menor a 500 ms, de crear pedido menor a 1.000 ms, errores menores a 1 %). Script k6 del catálogo en `tests/carga/catalogo.js`.
 
-**Medición (E08):** la primera ejecución no cumplió los umbrales (p95 de 3,2 s y 22 solicitudes por segundo) porque el gateway creaba un cliente HTTP por solicitud (INC06). Con el arreglo, el catálogo cumple con holgura: p95 de 19 ms, 65 solicitudes por segundo y 0 % de errores. Los umbrales no se cambiaron.
+**Medición (E08):** la primera ejecución no cumplió los umbrales (p95 de 3,2 s y 22 solicitudes por segundo) porque el gateway creaba un cliente HTTP por solicitud (INC06). Con el arreglo, el catálogo cumple con holgura: p95 de 19 ms, 65 solicitudes por segundo y 0 % de errores. Los umbrales no se cambiaron. Una tercera ejecución, con `docker stats`, midió CPU y memoria: gateway e inventory llegan a 87 % y 93 % de un núcleo, con 57,5 MiB y 92,9 MiB como máximo y sin reinicios.
 
 - **ADR gRPC:** no se usa. Con esta carga, HTTP con JSON entre servicios alcanza y es más fácil de depurar y correlacionar.
 - **ADR analítica:** el reporte de ventas es un endpoint dentro de orders (S19), no un servicio aparte.
@@ -110,8 +110,8 @@ Carga proyectada de un local pequeño: hasta 500 pedidos y 10.000 consultas al c
 |---|---|---|
 | gateway | Lista blanca, sesión por cookie, identidad hacia los servicios, `X-Request-ID`, logs JSON, errores con formato único, secretos desde Vault, front estático en el mismo origen, un solo cliente HTTP (INC06) | E01, E07, E08 |
 | auth | Usuarios y sesiones en Mongo, bcrypt costo 12, token guardado como hash, TTL de 900 s | E02 a E06 (`/introspect` en cada traza) |
-| inventory | Catálogo, stock, reservas y devoluciones internas, lote para GraphQL | E01, E02, E05 |
-| orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03 |
+| inventory | Catálogo, stock, reservas y devoluciones internas, lote para GraphQL | E01, E02, E05, E10 |
+| orders | Pedidos con idempotencia, precio del servidor, cajero virtual, anulación con motivo, cola de despacho, estados, boleta y reporte de ventas | E02, E03, E10 |
 | payments | Pago con idempotencia, proveedor simulado (inmediato o aviso), reconciliación si orders cae | E03, E04 |
 | graphql-gateway | `misPedidos` y `pedido` con DataLoader, límites y errores parciales | E05, E06 |
 | front | Catálogo, carrito, login, checkout, pago, boleta y mis pedidos contra el backend real | E09 (escritorio, celular y error parcial) |
@@ -138,7 +138,7 @@ Cada cambio está en [`bitacora.md`](bitacora.md) (INCR-00 en adelante) y las fa
 
 **Documento:** [`matriz-requisitos.md`](matriz-requisitos.md)
 
-Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04, R07 y R12 tienen evidencia aprobada, y R08 en parte; R09, R10 y R13 tienen el servicio implementado pero sin evidencia (no tienen pantalla); R05, R06 y R11 son brechas.
+Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01 a R04, R07, R09, R12 y R13 tienen evidencia aprobada; R08 y R10 en parte (sin correo y sin mantenedor de usuarios y clientes); R05, R06 y R11 son brechas. Los servicios sin pantalla (productos como ADMIN, cola de despacho y reporte) se probaron por API (E10).
 
 ## Brechas declaradas
 
@@ -158,12 +158,12 @@ Une cada requisito con su pantalla, servicio, prueba, resultado y evidencia. R01
 | Stock descontado sin pedido si inventory responde después del plazo de orders | Requiere reservas con ID propio | M3 |
 | GraphQL: `stock` no lo puede ver nadie (las queries son solo de CLIENTE), lote máximo de 50 productos e introspección activa | Decisiones de alcance | M8 |
 | Cuentas de prueba con sus claves visibles en el login | Facilitan la demo; son ficticias | M7 |
-| CPU y memoria no medidas en la prueba de carga; orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud | Solo se sometió a carga el catálogo | M9 |
-| Sin evidencia de la cola de despacho, el reporte de ventas ni el mantenedor de productos como ADMIN | No tienen pantalla en la U2 | Matriz de requisitos |
+| Solo se sometió a carga el catálogo; orders, payments y graphql-gateway todavía crean un cliente HTTP por solicitud, y gateway e inventory llegan cerca de un núcleo con 100 usuarios | Alcance de la medición | M9 |
+| DESPACHO se entera del estado de un pedido sin pagar al intentar moverlo (409 en vez de 404, INC07) | Encontrado al revisar E10 | Incidencias |
 
 ## Anexos y evidencias
 
-- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E09, cada una con su ficha).
+- Índice de evidencias: [`../evidencias/indice.md`](../evidencias/indice.md) (E01 a E10, cada una con su ficha).
 - Protocolo de pruebas: [`protocolo-pruebas.md`](protocolo-pruebas.md).
 - Incidencias: [`incidencias.md`](incidencias.md).
 - Bitácora de incrementos: [`bitacora.md`](bitacora.md).

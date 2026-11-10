@@ -51,7 +51,7 @@ Se fijan **antes** de medir. Si una medición no los cumple, se registra como in
 
 Cada usuario virtual hace `GET /api/v1/productos` a través del gateway y espera 1 segundo entre solicitudes.
 
-**CPU y memoria:** el plan era registrar `docker stats` durante la prueba, pero no se hizo; esos dos indicadores quedan sin dato.
+**CPU y memoria:** se midieron en una tercera ejecución, registrando `docker stats` cada segundo y medio mientras corría k6 (81 muestras, `evidencias/u2/k6-docker-stats.csv`).
 
 **Cómo reproducirlo** (todo dentro de Docker, sin instalar k6):
 
@@ -68,8 +68,18 @@ Ficha: `evidencias/u2/ficha-E08.md`. Se ejecutó dos veces: la primera no cumpli
 | p95 catálogo | < 500 ms | 3.163 ms | 19,2 ms | Sí (después del arreglo) |
 | Throughput catálogo | ≥ 25 req/s | 22,2 req/s | 65,0 req/s | Sí (después del arreglo) |
 | Tasa de errores | < 1% | 0 % | 0 % | Sí |
-| CPU máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sin dato |
-| Memoria máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sin dato |
+| CPU máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sí (tercera ejecución: 87 % y 93 % de un núcleo) |
+| Memoria máxima (gateway / inventory) | Sin reinicios | No medido | No medido | Sí (tercera ejecución: 57,5 MiB y 92,9 MiB, sin reinicios) |
+
+**Tercera ejecución, con CPU y memoria** (09-11-2026, equipo de Flo, mismo escenario y umbrales): p95 de 59,8 ms, 63,7 solicitudes por segundo y 0 % de errores (8.616 solicitudes). El p95 es más alto que en la segunda ejecución (19 ms) porque fue en otro equipo, pero cumple con holgura. Máximos por contenedor:
+
+| Contenedor | CPU máxima (100 % = un núcleo) | Memoria máxima |
+|---|---|---|
+| gateway | 87 % | 57,5 MiB |
+| inventory | 93 % | 92,9 MiB |
+| mongo | 110 % | 370 MiB |
+
+Ningún contenedor se reinició y ninguno se acercó al límite de memoria (2,76 GiB en ese equipo). gateway e inventory quedan cerca de un núcleo completo con 100 usuarios, así que con más carga el siguiente cuello de botella sería la CPU de esos dos servicios (uvicorn corre con un solo proceso). Archivos: `evidencias/u2/k6-catalogo-con-stats.json` y `evidencias/u2/k6-docker-stats.csv`.
 
 **Qué pasó en la primera ejecución:** el gateway creaba un cliente HTTP nuevo (`httpx.AsyncClient`) en cada solicitud, y armar ese cliente cada vez saturaba su CPU. Con 100 usuarios, cada respuesta tardaba unos 2 segundos. Se cambió a un solo cliente compartido para todo el gateway (INC06) y el p95 bajó de 3,2 s a 19 ms.
 
