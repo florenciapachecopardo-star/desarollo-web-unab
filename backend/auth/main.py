@@ -5,12 +5,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Depends, FastAPI, Header
+from fastapi import Depends, FastAPI, Header, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 
-from observabilidad import ApiError, instalar, log
+from observabilidad import ApiError, instalar, log, request_id_de
 
 SERVICE = "auth"
 
@@ -66,9 +66,13 @@ def huella(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def verify_gateway(x_gateway_secret: str = Header(default="")):
+def verify_gateway(request: Request, x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, AUTH_INTROSPECTION_SECRET):
+        log(SERVICE, level="warning", event="gateway_secret_rejected", request_id=request_id_de(request),
+            path=request.url.path)
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+    log(SERVICE, level="info", event="gateway_secret_ok", request_id=request_id_de(request),
+        path=request.url.path)
 
 
 def verify_clients(x_service_secret: str = Header(default="")):
@@ -108,9 +112,13 @@ async def login(datos: LoginRequest):
 
 
 @app.post("/introspect", dependencies=[Depends(verify_gateway)])
-async def introspect(datos: TokenRequest):
+async def introspect(datos: TokenRequest, request: Request):
+    # Evidencia U3 (punto 3): auth registra la validacion de la sesion y su resultado.
+    # Nunca se registra el token ni su huella.
     sesion = await sesiones.find_one({"_id": huella(datos.token)})
     if sesion is None:
+        log(SERVICE, level="info", event="token_validated", request_id=request_id_de(request),
+            active=False, motivo="sesion_no_existe")
         return {"active": False}
 
     expira = sesion["expires_at"]
@@ -118,8 +126,12 @@ async def introspect(datos: TokenRequest):
         expira = expira.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) >= expira:
         await sesiones.delete_one({"_id": sesion["_id"]})
+        log(SERVICE, level="info", event="token_validated", request_id=request_id_de(request),
+            active=False, motivo="sesion_expirada")
         return {"active": False}
 
+    log(SERVICE, level="info", event="token_validated", request_id=request_id_de(request),
+        active=True, user_id=sesion["user_id"], roles=sesion["roles"])
     return {
         "active": True,
         "user_id": sesion["user_id"],

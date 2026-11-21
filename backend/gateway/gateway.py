@@ -139,7 +139,9 @@ _cache_secretos = {"datos": None, "expira": 0.0}
 
 async def secretos(request: Request) -> dict:
     if _cache_secretos["datos"] and time.monotonic() < _cache_secretos["expira"]:
+        request.state.origen_secreto = "cache"
         return _cache_secretos["datos"]
+    request.state.origen_secreto = "vault"
 
     try:
         resp = await _http.get(
@@ -185,8 +187,15 @@ async def obtener_identidad(request: Request) -> dict:
     if not token:
         raise ApiError(401, "UNAUTHENTICATED", "Inicia sesion para continuar")
 
+    # Evidencia U3 (punto 2): el gateway deja registro de que pide validacion a auth
+    # antes de enrutar, y de lo que auth contesto. Nunca se registra el token.
+    log(SERVICE, level="info", event="auth_validation_requested", request_id=request_id_de(request),
+        auth_endpoint="/introspect", path=request.url.path)
     resp = await llamar_auth(request, "/introspect", {"token": token}, con_secreto=True)
     data = resp.json() if resp.status_code == 200 else {}
+    log(SERVICE, level="info", event="auth_validation_result", request_id=request_id_de(request),
+        auth_status=resp.status_code, active=bool(data.get("active")),
+        user_id=data.get("user_id"), roles=data.get("roles", []))
     if not data.get("active"):
         raise ApiError(401, "SESSION_INVALID", "Tu sesion expiro o no es valida")
 
@@ -217,6 +226,10 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
         "X-Gateway-Secret": (await secretos(request))[destino.secreto],
         REQUEST_ID_HEADER: request_id_de(request),
     }
+    # Solo el nombre de la clave y de donde salio (Vault o cache), nunca el valor
+    log(SERVICE, level="info", event="secret_used", request_id=request_id_de(request),
+        vault_path="secret/gateway", key=destino.secreto,
+        origen=getattr(request.state, "origen_secreto", "-"))
     if identidad:
         headers["X-Authenticated-User"] = identidad["user_id"]
         headers["X-Authenticated-Roles"] = ",".join(identidad["roles"])
@@ -224,6 +237,7 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
         if request.headers.get(nombre):
             headers[nombre] = request.headers[nombre]
 
+    inicio = time.perf_counter()
     try:
         upstream = await _http.request(
             ruta.method,
@@ -232,6 +246,11 @@ async def reenviar(request: Request, ruta: RouteDefinition, identidad: dict | No
             content=await request.body(),
             headers=headers,
         )
+        # Evidencia U3 (punto 2): a que backend se enruto y que respondio
+        log(SERVICE, level="info", event="routed", request_id=request_id_de(request),
+            route_id=ruta.id, method=ruta.method, destino=ruta.destino,
+            upstream=f"{destino.url}{ruta_interna}", upstream_status=upstream.status_code,
+            upstream_ms=round((time.perf_counter() - inicio) * 1000, 1))
     except httpx.TimeoutException:
         raise ApiError(504, "UPSTREAM_TIMEOUT", f"El servicio {ruta.destino} no respondio a tiempo")
     except httpx.RequestError:
@@ -250,7 +269,11 @@ def registrar(ruta: RouteDefinition):
         if ruta.acceso != "anonimo":
             identidad = await obtener_identidad(request)
             if ruta.acceso == "rol" and not set(ruta.roles) & set(identidad["roles"]):
+                log(SERVICE, level="warning", event="authorization_denied", request_id=request_id_de(request),
+                    route_id=ruta.id, roles_requeridos=list(ruta.roles), roles=identidad["roles"])
                 raise ApiError(403, "FORBIDDEN", "No tienes permiso para esta operacion")
+            log(SERVICE, level="info", event="authorization_granted", request_id=request_id_de(request),
+                route_id=ruta.id, acceso=ruta.acceso, roles=identidad["roles"])
         return await reenviar(request, ruta, identidad)
 
     app.add_api_route(ruta.path, handler, methods=[ruta.method], name=ruta.id)
