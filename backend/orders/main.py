@@ -107,15 +107,28 @@ class CambioEstado(BaseModel):
 # Seguridad
 # ---------------------------------------------------------------------------
 
-def verify_gateway(x_gateway_secret: str = Header(default="")):
+def _log_secreto(request: Request, ok: bool, origen: str = "-"):
+    """Evidencia U3 (punto 4): si orders dejo pasar o bloqueo la llamada. Nunca el valor del secreto."""
+    log(SERVICE, level="info" if ok else "warning",
+        event="gateway_secret_ok" if ok else "gateway_secret_rejected",
+        request_id=request_id_de(request), method=request.method, path=request.url.path, origen=origen)
+
+
+def verify_gateway(request: Request, x_gateway_secret: str = Header(default="")):
     if not secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
+        _log_secreto(request, ok=False)
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
+    _log_secreto(request, ok=True, origen="api-gateway")
 
 
-def verify_lectura(x_gateway_secret: str = Header(default="")):
+def verify_lectura(request: Request, x_gateway_secret: str = Header(default="")):
     """Lecturas: las acepta el API Gateway o el GraphQL Gateway, cada uno con su propio secreto."""
-    if not (secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET)
-            or secrets.compare_digest(x_gateway_secret, GRAPHQL_ORDERS_SECRET)):
+    if secrets.compare_digest(x_gateway_secret, INTERNAL_GATEWAY_SECRET):
+        _log_secreto(request, ok=True, origen="api-gateway")
+    elif secrets.compare_digest(x_gateway_secret, GRAPHQL_ORDERS_SECRET):
+        _log_secreto(request, ok=True, origen="graphql-gateway")
+    else:
+        _log_secreto(request, ok=False)
         raise ApiError(403, "FORBIDDEN", "Solicitud no autorizada: debe pasar por el gateway")
 
 
@@ -295,7 +308,8 @@ async def crear_pedido(
         return salida(existente, quien)
 
     log(SERVICE, level="info", event="order_created", request_id=request_id_de(request),
-        pedido_id=pedido["_id"], user_id=quien.user_id, total=pedido["total"])
+        pedido_id=pedido["_id"], user_id=quien.user_id, total=pedido["total"],
+        db=MONGO_DB, collection="pedidos", operacion="insert_one")
     return salida(pedido, quien)
 
 
