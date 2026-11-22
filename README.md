@@ -2,8 +2,8 @@
 
 Tienda online de una chocolatería artesanal, basada en el **Caso 19 "Sistema de Ventas On-line"** y adaptada de sushería a chocolatería.
 
-**Asignatura:** Desarrollo Web y Móvil, UNAB, sección 8750
-**Integrantes:** Florencia Pacheco y Karla Muñoz
+**Asignatura:** Desarrollo Web y Móvil, UNAB, sección 8750  
+**Integrantes:** Florencia Pacheco y Karla Muñoz  
 **Versión entregada (Unidad 2):** tag `u2-final`
 
 El informe completo de la entrega está en [`docs/informe.md`](docs/informe.md).
@@ -25,7 +25,7 @@ El informe completo de la entrega está en [`docs/informe.md`](docs/informe.md).
 
 ## Arquitectura en corto
 
-- **Un solo punto de entrada:** solo el gateway publica un puerto (`8000`). También sirve el front, así que front y API están en el mismo origen.
+- **Puntos de entrada:** el contenedor `frontend` (nginx, puerto `8080`) sirve el sitio y reenvía todo `/api/` al gateway. El gateway (puerto `8000`) es la única puerta a la API; también sirve el front, para las pruebas automáticas.
 - **Red privada:** auth, clients, inventory, orders, payments, graphql-gateway, Vault y Mongo están en una red `internal` de Docker, sin acceso desde fuera.
 - **Límite de solicitudes:** el gateway corta con 429 por IP (login 20/min, registro 10/min).
 - **Secretos:** un secreto por integración. Se definen en `.env`, que nunca se sube al repo; el gateway los lee desde Vault.
@@ -35,7 +35,7 @@ El informe completo de la entrega está en [`docs/informe.md`](docs/informe.md).
 ## Requisitos
 
 - Docker Desktop con Docker Compose v2. Se probó con Docker 29.9.2 y Compose v5.6.1.
-- Puerto `8000` libre.
+- Puertos `8000` y `8080` libres.
 
 ## Cómo levantarlo
 
@@ -62,7 +62,7 @@ docker compose ps
 docker compose run --rm seed --reset
 ```
 
-**4. Abrir** <http://localhost:8000>.
+**4. Abrir** <http://localhost:8080> (contenedor frontend). También funciona <http://localhost:8000>, servido por el gateway.
 
 **Para detenerlo:** `docker compose down`. Para borrar también la base: `docker compose down -v`.
 
@@ -92,7 +92,7 @@ docker compose run --rm seed --reset      # o: scripts/reset.sh
 | Pruebas automáticas (P01 a P06, idempotencia, GraphQL, clients y límite de solicitudes). Si se repiten, esperar 1 minuto entre rondas (la última prueba deja el login limitado por un minuto) | `docker compose run --rm pruebas` | `evidencias/u2/pytest/` |
 | Carga del catálogo (k6) | `docker compose run --rm k6` | `evidencias/u2/k6-catalogo.json` |
 | Revisar un pedido o producto en la base | `docker compose run --rm check pedido PED-0001` | Pantalla |
-| Ver la traza de una solicitud en todos los servicios | `scripts/logs.sh <X-Request-ID>` | Pantalla |
+| Ver la traza de una solicitud en todos los servicios | `sh scripts/logs.sh <X-Request-ID>` (en PowerShell: `.\scripts\logs.ps1 <X-Request-ID>`) | Pantalla |
 | Estado de un servicio | `curl http://localhost:8000/health` | Pantalla |
 
 El protocolo completo está en [`docs/protocolo-pruebas.md`](docs/protocolo-pruebas.md), y la relación entre requisitos, pantallas, servicios y pruebas, en [`docs/matriz-requisitos.md`](docs/matriz-requisitos.md).
