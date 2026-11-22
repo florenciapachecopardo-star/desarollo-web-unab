@@ -2,7 +2,7 @@
 
 Diagrama de clases: `docs/uml-gateway.drawio` (se abre en app.diagrams.net).
 
-**Fuente:** `backend/gateway/gateway.py`, `backend/gateway/observabilidad.py`, `backend/graphql-gateway/main.py` y `docker-compose.yml` en `main` (commit `5ee71b8`). El detalle de GraphQL está en `docs/m8-graphql.md`.
+**Fuente:** `backend/gateway/gateway.py`, `backend/gateway/observabilidad.py`, `backend/graphql-gateway/main.py` y `docker-compose.yml` en `main` (commit `9deda9b`, con clients del PR #47 y el contenedor frontend y los logs del PR #48). El detalle de GraphQL está en `docs/m8-graphql.md`.
 
 ## 1. Un solo gateway
 
@@ -12,7 +12,7 @@ Chocomanía usa **un único API Gateway**. Se eligió uno solo porque:
 - La carga proyectada es baja (menos de 25 solicitudes por segundo en el peak, ver `docs/m9-carga.md`).
 - Un solo lugar concentra la lista blanca, la validación de sesión, el `X-Request-ID` y la lectura de secretos, así que es más fácil de revisar y probar.
 
-El GraphQL Gateway no es un segundo punto de entrada: es privado (sin puerto publicado) y solo se llega a él a través del API Gateway, por S18. El API Gateway también sirve los archivos del front en el mismo origen (`http://localhost:8000`), así que el navegador no necesita CORS.
+El GraphQL Gateway no es un segundo punto de entrada: es privado (sin puerto publicado) y solo se llega a él a través del API Gateway, por S18. Desde la U3 el sitio se abre en el contenedor `frontend` (nginx, `http://localhost:8080`), que sirve los archivos estáticos y reenvía todo `/api/` al gateway. El contenedor frontend no valida nada ni tiene secretos: solo pasa la solicitud, así que el gateway sigue siendo el único punto de control de la API. Como el navegador ve el front y la API en el mismo origen, no necesita CORS. El gateway también sigue sirviendo el front en `http://localhost:8000`, para las pruebas automáticas.
 
 ## 2. Clases del diagrama
 
@@ -52,10 +52,12 @@ flowchart LR
         PROV["Proveedor de pagos simulado"]
     end
     subgraph PUB["Red pública"]
+        FRONT["frontend (nginx) :8080"]
         GW["API Gateway :8000"]
     end
     subgraph PRIV["Red privada (internal)"]
         AUTH["auth"]
+        CLI["clients"]
         INV["inventory"]
         ORD["orders"]
         PAY["payments"]
@@ -63,9 +65,12 @@ flowchart LR
         VAULT["Vault"]
         MONGO["MongoDB"]
     end
-    NAV -- "cookie session_token" --> GW
+    NAV -- "cookie session_token" --> FRONT
+    FRONT -- "/api/ sin cambios" --> GW
     PROV -- "X-Proveedor-Secret" --> GW
     GW -- "auth_introspection_secret" --> AUTH
+    GW -- "clients_shared_secret" --> CLI
+    CLI -- "CLIENTS_AUTH_SECRET" --> AUTH
     GW -- "backend_shared_secret" --> INV
     GW -- "orders_shared_secret" --> ORD
     GW -- "payments_shared_secret" --> PAY
@@ -76,6 +81,7 @@ flowchart LR
     ORD -- "ORDERS_INVENTORY_SECRET" --> INV
     PAY -- "PAYMENTS_ORDERS_SECRET" --> ORD
     AUTH --> MONGO
+    CLI --> MONGO
     INV --> MONGO
     ORD --> MONGO
     PAY --> MONGO
@@ -83,7 +89,7 @@ flowchart LR
 
 | Frontera | Qué no se confía | Cómo se controla |
 |---|---|---|
-| 1. Navegador → gateway | Nada de lo que manda el navegador | Lista blanca de rutas y verbos; parámetros validados (`^[A-Za-z0-9_-]{1,64}$`); sesión validada con auth en cada solicitud; los `X-Authenticated-*` del navegador se descartan; `X-Request-ID` se acepta solo si es válido; solo se reenvían `content-type`, `idempotency-key` y `x-proveedor-secret` |
+| 1. Navegador → frontend → gateway | Nada de lo que manda el navegador. El frontend solo reenvía `/api/` y no agrega identidad ni secretos | Lista blanca de rutas y verbos; parámetros validados (`^[A-Za-z0-9_-]{1,64}$`); sesión validada con auth en cada solicitud; los `X-Authenticated-*` del navegador se descartan; `X-Request-ID` se acepta solo si es válido; solo se reenvían `content-type`, `idempotency-key` y `x-proveedor-secret` |
 | 2. Proveedor → gateway → payments | El aviso de pago | payments revisa `X-Proveedor-Secret` y procesa cada aviso una sola vez |
 | 3. Gateway → servicios internos | Que alguien llame a un servicio sin pasar por el gateway | Red privada sin acceso desde fuera; cada servicio exige su propio `X-Gateway-Secret`; solo con ese secreto confía en `X-Authenticated-User` y `X-Authenticated-Roles` |
 | 4. Servicio → servicio | Que un servicio use una operación que no le corresponde | Secretos distintos por integración: orders → inventory, payments → orders y graphql-gateway → orders e inventory. Los de graphql-gateway solo sirven para leer |
@@ -154,3 +160,33 @@ Lo que se espera ver:
 - Si el navegador manda además `X-Authenticated-Roles: ADMIN` para engañar al gateway, el resultado es el mismo, porque ese header se descarta.
 
 Otras denegaciones que corta el gateway antes de llegar al servicio: sin cookie (401 `UNAUTHENTICATED`), sesión vencida (401 `SESSION_INVALID`), ruta o verbo fuera de la lista blanca (404 o 405) e ID con formato inválido (400 `INVALID_ID`).
+
+## 7. Logs de trazabilidad (U3)
+
+Desde el PR #48 cada contenedor deja una línea por paso, todas con el mismo `request_id`, para seguir una solicitud de punta a punta en el video. Se ven con `sh scripts/logs.sh <request_id>` (o `.\scripts\logs.ps1 <request_id>` en Windows), que muestra primero la línea del frontend y después el resto ordenado por hora. Ningún log registra tokens, cookies, contraseñas ni valores de secretos: solo nombres de claves.
+
+**Caso:** un CLIENTE crea un pedido (S11) desde `http://localhost:8080`. Eventos en el orden en que el código los escribe:
+
+| # | Contenedor | Evento | Qué muestra |
+|---|---|---|---|
+| 1 | frontend | `api_proxied` | Método, ruta, estado, `proxy_to: gateway:8000` y el `request_id` que devolvió el gateway |
+| 2 | gateway | `auth_validation_requested` | Que pide validar la sesión a auth (`/introspect`) antes de enrutar |
+| 3 | gateway | `secret_loaded` | Solo si el secreto no estaba en caché (60 s): lee `secret/gateway` y registra los nombres de las claves |
+| 4 | auth | `gateway_secret_ok` | auth aceptó el secreto del gateway |
+| 5 | auth | `token_validated` | `active: true`, `user_id` y roles (o `active: false` con el motivo) |
+| 6 | gateway | `auth_validation_result` | Lo que contestó auth: estado, `active`, `user_id`, roles |
+| 7 | gateway | `authorization_granted` | La ruta (S11), el tipo de acceso y los roles del usuario |
+| 8 | gateway | `secret_used` | Qué clave usó para el servicio destino (`orders_shared_secret`) y si salió de Vault o de la caché |
+| 9 | orders | `gateway_secret_ok` | orders aceptó la llamada y de quién vino (`origen: api-gateway`) |
+| 10 | orders | `order_created` | Pedido, usuario, total, base, colección `pedidos` y operación `insert_one` |
+| 11 | gateway | `routed` | Servicio destino, URL interna, estado que respondió y tiempo en ms |
+
+Además, cada servicio escribe al final su línea `request` (método, ruta, estado y ms); inventory aparece solo con esa línea, por la reserva de stock (`POST /interno/reservas`) que pide orders.
+
+Como la caché del secreto dura 60 segundos, `secret_loaded` casi nunca aparece en solicitudes seguidas y `secret_used` sale casi siempre con `origen: cache`. Para que se vea la lectura desde Vault en el video, se reinicia el gateway (`docker compose restart gateway`) justo antes de crear el pedido.
+
+**Rechazos que también quedan en el log:**
+
+- **Rol sin permiso** (por ejemplo, un usuario DESPACHO que intenta crear un pedido, que S11 solo permite a CLIENTE): el gateway escribe `authorization_denied` con los roles requeridos y los del usuario, y responde 403. No hay `routed` ni ninguna línea de orders.
+- **Llamada a orders sin el secreto del gateway** (desde dentro de la red privada): orders escribe `gateway_secret_rejected` y responde 403 antes de tocar la base, porque la revisión del secreto corre antes que la operación.
+

@@ -2,7 +2,7 @@
 
 La parte 1 (registro de stakeholders) está en `docs/m4-stakeholders.md`.
 
-**Fuente:** código del gateway, auth, inventory, orders, payments y graphql-gateway en `main` (commit `5ee71b8`). S09 y S10 (clients) no están implementados en la U2: el registro y el perfil quedan en el front con localStorage.
+**Fuente:** código del gateway, auth, clients, inventory, orders, payments y graphql-gateway en `main` (commit `566dea1`). S09, S09V y S10 (clients) se agregaron en el PR #47: el registro y el perfil ya no usan localStorage.
 
 ## 1. Cómo se decide un permiso
 
