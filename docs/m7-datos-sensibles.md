@@ -1,6 +1,6 @@
 # M7. Datos sensibles
 
-**Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Las 6 pruebas de seguridad (sección 7) se ejecutaron el 08-11-2026 con pytest y pasaron todas (E07).
+**Estado:** versión final, revisada contra el código de `main` (bdd26ff): auth, inventory, orders, payments, graphql-gateway, gateway y `frontend/js`. Las 6 pruebas de seguridad (sección 7) se ejecutaron el 08-11-2026 con pytest y pasaron todas; se repitieron el 23-11-2026 junto con las pruebas de clients (22 de 22, E07).
 
 **Actualización del 9 de noviembre:** el servicio clients quedó implementado (S09, S09V y S10). RUN, dirección, teléfono, fecha de nacimiento y sexo se guardan en la base `clients`; la clave la recibe auth y guarda solo su hash bcrypt. S10 devuelve solo lo que el front necesita (sin fecha de nacimiento ni sexo). Las filas que digan "clients" deben leerse como implementadas.
 
