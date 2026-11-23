@@ -1,10 +1,10 @@
 # M6. Matriz de rutas e inventario de secretos
 
-**Fuente:** `backend/gateway/gateway.py`, `backend/graphql-gateway/main.py`, `docker-compose.yml`, `scripts/vault-init.sh` y `.env.example` en `main` (commit `5ee71b8`). Clients (S09, S10) no está implementado en la U2.
+**Fuente:** `backend/gateway/gateway.py`, `backend/graphql-gateway/main.py`, `docker-compose.yml`, `scripts/vault-init.sh` y `.env.example` en `main` (commit `9deda9b`). S09, S09V y S10 (clients) se agregaron en el PR #47 y el contenedor frontend en el PR #48.
 
 ## 1. Un solo gateway
 
-Hay un único API Gateway (`gateway`, puerto 8000). Es el único contenedor en la red pública; todos los demás (auth, inventory, orders, payments, graphql-gateway, Vault y Mongo) están en la red privada `privada`, marcada como `internal` en `docker-compose.yml`, sin entrada ni salida desde fuera. Con el volumen del caso (ver `docs/m9-carga.md`) un gateway basta.
+Hay un único API Gateway (`gateway`, puerto 8000). En la red pública están solo el gateway y, desde la U3, el contenedor `frontend` (nginx, puerto 8080), que sirve el sitio y reenvía `/api/` al gateway sin validar nada ni tener secretos. Todos los demás (auth, clients, inventory, orders, payments, graphql-gateway, Vault y Mongo) están en la red privada `privada`, marcada como `internal` en `docker-compose.yml`, sin entrada ni salida desde fuera. Con el volumen del caso (ver `docs/m9-carga.md`) un gateway basta.
 
 ## 2. Controles comunes a todas las rutas
 
@@ -106,7 +106,7 @@ Valores que ya se dan por quemados (quedaron en el historial de git en semanas a
 |---|---|
 | `.env` | En `.gitignore`, no está en el repo |
 | `.env.example` | Solo nombres, todos vacíos |
-| Logs | El gateway registra `secret_loaded` con los nombres de las claves, nunca los valores. Los logs no incluyen tokens, cookies, contraseñas ni correos |
+| Logs | El gateway registra `secret_loaded` y `secret_used` con los nombres de las claves y si salieron de Vault o de la caché, nunca los valores. auth y orders registran `gateway_secret_ok` o `gateway_secret_rejected` sin el secreto. Los logs no incluyen tokens, cookies, contraseñas ni correos (detalle de eventos en el M5, sección 7) |
 | Evidencias (`evidencias/u2/`) | Revisadas: sin secretos ni tokens; solo datos ficticios |
 | `backend/gateway/README.md` | Tenía las instrucciones de la Semana 8 con secretos de laboratorio quemados. **Borrado** en INCR-24. Siguen en el historial de git; eran valores de laboratorio que no se usan en el stack actual |
 | `frontend/js/login.js` | Solo muestra la cuenta de cliente de prueba (ficticia). Las cuentas del personal se sacaron del front y quedan solo en el README |
