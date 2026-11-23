@@ -1,18 +1,18 @@
-# Ficha de evidencia E07: pruebas automáticas de seguridad (P01 a P06), idempotencia, GraphQL e INC04
+# Ficha de evidencia E07: pruebas automáticas de seguridad (P01 a P06), clients, idempotencia, GraphQL, INC04 y límite de solicitudes
 
 | Campo | Valor |
 |---|---|
 | ID | E07 (pruebas P01 a P06 y casos adicionales) |
-| Nombre de la prueba | 16 pruebas automáticas con pytest contra el gateway y, para P05, directo a los servicios de la red privada |
-| Módulo | M7 (pruebas de seguridad), M4 (permisos), M8 (límite de profundidad) y M10 |
-| Requisito relacionado | R01, R02, R07, R10, R12 |
-| Servicio y ruta | S01, S03, S08, S11, S12, S16 y S18, más llamadas directas a inventory, orders y payments |
-| Rol que ejecuta | Anónimo, CLIENTE (USR-0001) y llamadas sin sesión desde la red privada |
-| Fecha y hora | 08-11-2026, 18:38 (America/Santiago), según `junit.xml` (21:38:03 UTC) |
-| Ejecutada por | Karla |
-| Código | Rama `pruebas-automaticas`, commit `3c8d960` (incluye el arreglo de INC04 y de INC06) |
-| Entorno | Windows con Docker Desktop. Stack de `docker-compose.yml`, servicio `pruebas` (Python 3.12.7, pytest 8.3.3, httpx 0.27.2) |
-| Estado | **Aprobada**: 16 de 16 |
+| Nombre de la prueba | 22 pruebas automáticas con pytest contra el gateway y, para P05, directo a los servicios de la red privada |
+| Módulo | M7 (pruebas de seguridad), M4 (permisos), M5 (límite de solicitudes y logs), M8 (límite de profundidad) y M10 |
+| Requisito relacionado | R01, R02, R06, R07, R10, R12 |
+| Servicio y ruta | S01, S03, S06, S08, S09, S09V, S10, S11, S12, S16 y S18, más llamadas directas a inventory, orders, payments, clients y auth |
+| Rol que ejecuta | Anónimo, CLIENTE (USR-0001 y un cliente nuevo registrado en la prueba) y llamadas sin sesión desde la red privada |
+| Fecha y hora | 23-11-2026, 01:57 (America/Santiago), según `junit.xml` (04:57:22 UTC) |
+| Ejecutada por | Flo |
+| Código | `main` en `1a033a2` (después del merge del PR #49; incluye clients del PR #47 y los logs de la U3 del PR #48) |
+| Entorno | Stack de `docker-compose.yml` en el equipo de Flo, servicio `pruebas` (Python 3.12.7, pytest 8.3.3) |
+| Estado | **Aprobada**: 22 de 22 |
 
 ## Precondiciones
 
@@ -23,51 +23,58 @@
 
 1. `docker compose run --rm seed --reset`
 2. `docker compose run --rm pruebas` (guarda `resultado.txt` y `junit.xml` en `evidencias/u2/pytest/`)
-3. `docker compose logs --no-color --no-log-prefix gateway auth inventory orders payments graphql-gateway`, filtrado a los `request_id` de esta ejecución en `logs.txt`
+3. `docker compose logs --no-color --no-log-prefix` de los servicios, filtrado a los `request_id` que imprime `resultado.txt`, en `logs.txt`
 
 ## Resultado esperado y obtenido
 
 | Prueba | Caso | Esperado | Obtenido | `request_id` |
 |---|---|---|---|---|
-| P01 | Catálogo sin sesión (S01) | 200 con 5 productos | 200 | `p01-e2b05666` |
-| P02 | Crear pedido sin sesión (S11) | 401 con formato de error único | 401 | `p02-52acc981` |
-| P02 | `/me` sin sesión pero con `X-Authenticated-User: USR-0003` y rol ADMIN falsos | 401: el gateway descarta esos headers | 401 | `p02-identidad-5fc1a0c4` |
-| P03 | CLIENTE crea un producto (S03) | 403 y el producto no aparece en el catálogo | 403 | `p03-8729a06a` |
-| P04 | CLIENTE ve el pedido ajeno PED-0002 (S12) | 404 `ORDER_NOT_FOUND`, sin líneas ni despacho | 404 | `p04-98438604` |
-| P04 | Pedido ajeno y pedido inexistente | Misma respuesta | 404 y mismo mensaje en los dos | `p04-ajeno-d6a53214`, `p04-inexistente-cde6ce21` |
-| P04 | Pagar el pedido ajeno (S16) | 404 `ORDER_NOT_FOUND` | 404 | `p04-pago-74caeebd` |
-| P04 | `pedido(id: "PED-0002")` por GraphQL (S18) | `null` | `null` | `p04-graphql-492ccfc7` |
-| P05 | Llamada directa a inventory, orders y payments sin secreto y con identidad falsa | Rechazada | 403 en los tres | `p05-inventory-21619548`, `p05-orders-b4944e4e`, `p05-payments-d927d2ab` |
-| P05 | inventory con un secreto inventado | Rechazada | 403 | `p05-falso-06354dd0` |
-| P06 | Pedido con `precio_unitario: 1`, `total: 1`, `estado: PAGADO` y `cajero_id: USR-0001` | Precio de inventory (8990), PENDIENTE_PAGO y cajero USR-0005 | Igual al esperado (201) | `p06-58898f29` |
-| P06 | Pago con `monto: 1` | Monto tomado de orders (8990) | 8990 (201) | `p06-pago-aad504b7` |
-| Idempotencia | Mismo `Idempotency-Key` dos veces en S11 | Mismo pedido y stock descontado una sola vez | Igual; stock de Chocolate blanco baja en 1 | `idem-pedido-1-7410ee28`, `idem-pedido-2-f4b4bf70` |
-| Idempotencia | Misma clave con otro cuerpo | 409 `IDEMPOTENCY_CONFLICT` | 409 | `idem-conflicto-0c233c4f` |
-| Idempotencia | Mismo `Idempotency-Key` dos veces en S16 | Mismo pago | Mismo pago (201 y 201) | `idem-pago-1-4cd46fa4`, `idem-pago-2-02144115` |
-| Idempotencia | Pagar otra vez el pedido ya pagado, con otra clave | 409 `PEDIDO_NO_PAGABLE` | 409 | `idem-pago-3-bccb810c` |
-| Idempotencia | S11 sin `Idempotency-Key` | 400 `IDEMPOTENCY_KEY_REQUIRED` | 400 | `idem-sin-clave-5a16998c` |
-| Stock | Pedir Trufas (stock 0) | 409 `STOCK_INSUFICIENTE` | 409 | `sin-stock-87c8a4fb` |
-| INC04 | Pedido con un producto válido y un ID mal formado | 400 `INVALID_ID` y el stock no cambia | Igual al esperado | `inc04-7853e5b1` |
-| GraphQL | Consulta con profundidad 8 | Rechazada sin datos | Error "exceeds maximum operation depth of 6", sin `data` | `gql-profundidad-6499d5e0` |
+| P01 | Catálogo sin sesión (S01) | 200 con 5 productos | 200 | `p01-200bd4cd` |
+| P02 | Crear pedido sin sesión (S11) | 401 con formato de error único | 401 | `p02-360d2983` |
+| P02 | `/me` sin sesión pero con `X-Authenticated-User: USR-0003` y rol ADMIN falsos | 401: el gateway descarta esos headers | 401 | `p02-identidad-1bb85637` |
+| P03 | CLIENTE crea un producto (S03) | 403 y el producto no aparece en el catálogo | 403; en el log, `authorization_denied` (requiere ADMIN, tiene CLIENTE) y ninguna línea de inventory | `p03-43744f5a`, `p03-verifica-6c7f75a3` |
+| P04 | CLIENTE ve el pedido ajeno PED-0002 (S12) | 404 `ORDER_NOT_FOUND`, sin líneas ni despacho | 404 | `p04-ff449aea` |
+| P04 | Pedido ajeno y pedido inexistente | Misma respuesta | 404 y mismo mensaje en los dos | `p04-ajeno-4b8207cc`, `p04-inexistente-5ddfca6d` |
+| P04 | Pagar el pedido ajeno (S16) | 404 `ORDER_NOT_FOUND` | 404 | `p04-pago-6cea59fa` |
+| P04 | `pedido(id: "PED-0002")` por GraphQL (S18) | `null` | `null`; orders responde 404 a graphql-gateway (`origen: graphql-gateway`) | `p04-graphql-5d1beefc` |
+| P05 | Llamada directa a inventory, orders y payments sin secreto y con identidad falsa | Rechazada | 403 en los tres | No se imprime (ver límites) |
+| P05 | inventory con un secreto inventado | Rechazada | 403 | No se imprime (ver límites) |
+| P05 | Llamada directa a clients (`/clientes/me`) y a auth (`/usuarios`) sin secreto | Rechazada | 403 en las dos | No se imprime (ver límites) |
+| P06 | Pedido con `precio_unitario: 1`, `total: 1`, `estado: PAGADO` y `cajero_id: USR-0001` | Precio de inventory (8990), PENDIENTE_PAGO y cajero USR-0005 | Igual al esperado (201); en el log, `order_created` PED-0003 con total 8990 | `p06-fb85d8c9` |
+| P06 | Pago con `monto: 1` | Monto tomado de orders (8990) | 8990 (201); en el log, `payment_started` con monto 8990 | `p06-pago-0bc6f81d` |
+| Clients | Registro, código malo, verificación y perfil propio (S09, S09V, S10) | 201 sin clave ni hash en la respuesta; login rechazado antes de verificar; 400 con código malo; 200 al verificar y en el perfil | Igual al esperado | `cli-registro-e611596d`, `cli-codigo-malo-4c25a71a`, `cli-verificar-ef1c5df1`, `cli-perfil-66b2d772` |
+| Clients | Registro con RUN o correo ya usados | 409 `CLIENT_EXISTS` | 201 el primero, 409 los dos repetidos | `cli-dup-1-c5a494bc`, `cli-dup-run-f4859fec`, `cli-dup-correo-f039c120` |
+| Clients | RUN inválido | 422 (validado en el servidor) | 422 | `cli-run-malo-3edf2ee7` |
+| Clients | Perfil sin sesión y con el cliente del seed | 401 y 200 (USR-0001) | 401 y 200 | `cli-perfil-anon-87959c7a`, `cli-perfil-seed-3271f02c` |
+| Idempotencia | Mismo `Idempotency-Key` dos veces en S11 | Mismo pedido y stock descontado una sola vez | Igual; stock de Chocolate blanco baja en 1. La segunda llamada deja `idempotent_replay` en orders | `idem-pedido-1-ca6f8f5b`, `idem-pedido-2-ebb5fb13`, `stock-ca301ec3`, `stock-823e10d4` |
+| Idempotencia | Misma clave con otro cuerpo | 409 `IDEMPOTENCY_CONFLICT` | 409 | `idem-conflicto-21ddfcae` |
+| Idempotencia | Mismo `Idempotency-Key` dos veces en S16 | Mismo pago | Mismo pago (201 y 201) | `idem-pago-1-7a74bd21`, `idem-pago-2-f7da68fd` |
+| Idempotencia | Pagar otra vez el pedido ya pagado, con otra clave | 409 `PEDIDO_NO_PAGABLE` | 409 | `idem-pago-3-6aa24514` |
+| Idempotencia | S11 sin `Idempotency-Key` | 400 `IDEMPOTENCY_KEY_REQUIRED` | 400 | `idem-sin-clave-d1e71bdd` |
+| Stock | Pedir Trufas (stock 0) | 409 `STOCK_INSUFICIENTE` | 409 | `sin-stock-eaaabb79` |
+| INC04 | Pedido con un producto válido y un ID mal formado | 400 `INVALID_ID` y el stock no cambia | Igual al esperado; inventory responde 400 en `/interno/reservas` | `inc04-b3261352`, `stock-738a39c5`, `stock-79224710` |
+| GraphQL | Consulta con profundidad 8 | Rechazada sin datos | Error "exceeds maximum operation depth of 6", sin `data`; `graphql_error` con código `VALIDATION` | `gql-profundidad-9f5c02fb` |
+| Límite | 25 logins seguidos con clave incorrecta (S06) | Solo 401 y 429, con al menos un 429 | 17 veces 401 y después 8 veces 429 | No se imprime (ver límites) |
 
 ## Evidencia
 
 | Archivo | Qué muestra |
 |---|---|
 | `evidencias/u2/pytest/resultado.txt` | Salida de pytest con cada prueba, su resultado y los `request_id` |
-| `evidencias/u2/pytest/junit.xml` | El mismo resultado en formato JUnit (16 pruebas, 0 fallas, 0 errores) |
-| `evidencias/u2/pytest/logs.txt` | Las 96 líneas de log de esta ejecución, de todos los servicios |
-| `tests/api/test_seguridad.py` | El código de cada prueba |
+| `evidencias/u2/pytest/junit.xml` | El mismo resultado en formato JUnit (22 pruebas, 0 fallas, 0 errores) |
+| `evidencias/u2/pytest/logs.txt` | Las 296 líneas de log de esta ejecución (04:57:23 a 04:57:26 UTC), de los 36 `request_id` de `resultado.txt`, con los eventos de la U3 |
+| `tests/api/test_seguridad.py`, `tests/api/test_clientes.py`, `tests/api/test_zz_limite.py` | El código de cada prueba |
 
-**Vinculación:** cada `request_id` de `resultado.txt` aparece en `logs.txt`. Por ejemplo, `inc04-7853e5b1` muestra a inventory respondiendo 400 en `/interno/reservas`, y luego a orders y al gateway con 400.
+**Vinculación:** los 36 `request_id` de `resultado.txt` aparecen en `logs.txt`, y `logs.txt` no tiene ningún otro. Por ejemplo, `p06-fb85d8c9` muestra el recorrido completo de un pedido: el gateway pide validar la sesión a auth, auth la valida (`token_validated`, USR-0001, CLIENTE), el gateway autoriza S11 (`authorization_granted`) y usa `orders_shared_secret` (`secret_used`), orders acepta el secreto (`gateway_secret_ok`), inventory reserva el stock y orders crea PED-0003 (`order_created`, colección `pedidos`, `insert_one`). La única lectura de Vault de la corrida (`secret_loaded`) está en la primera solicitud, `cli-registro-e611596d`; las demás usan la caché.
 
 ## Límites de interpretación
 
-- Las llamadas de P05 no llevan `X-Request-ID` propio en el log del gateway porque no pasan por él: se buscan como `p05-...` en los logs de cada servicio.
-- En P05, los logs de inventory, orders y payments muestran `user_id: USR-0001` aunque la llamada fue rechazada: el log registra la identidad que venía en el header falso. No da acceso a nada, pero el log no debería confiar en ese header si la llamada no trae el secreto (queda anotado como mejora).
-- Antes de esta ejecución hubo dos corridas iguales (21:15 y 21:34 UTC) con el mismo resultado; la evidencia guardada es la última, después del arreglo de INC06.
-- Una sola máquina (Windows con Docker Desktop).
+- P05 y el límite de solicitudes no imprimen `request_id` en `resultado.txt` (P05 llama directo a los servicios sin pasar por el gateway y el login del límite no lleva uno propio), así que sus líneas no están en `logs.txt`. Su evidencia son los códigos de `resultado.txt` y `junit.xml`.
+- Las pruebas llaman al gateway en el puerto 8000, no por el contenedor frontend: en `logs.txt` no hay líneas `api_proxied`. El paso por el frontend se muestra en el video de la U3.
+- `test_zz_limite` deja el login bloqueado un minuto: si se repite la ronda, hay que esperar entre una y otra.
+- Esta corrida reemplaza la del 08-11-2026 (16 de 16, 96 líneas de log), que ya no calzaba con las pruebas de clients agregadas en el PR #47.
+- Una sola máquina.
 
 ## Conclusión
 
-Aprobada. Las 6 pruebas de seguridad del M7 pasan, junto con la idempotencia de pedidos y pagos, el límite de profundidad de GraphQL y la regresión de INC04.
+Aprobada. Pasan las 6 pruebas de seguridad del M7, las de clients (registro, verificación, duplicados, validación en el servidor, perfil propio y acceso directo), la idempotencia de pedidos y pagos, el límite de profundidad de GraphQL, la regresión de INC04 y el límite de solicitudes del login. Los logs muestran, con el mismo `request_id`, la validación de la sesión con auth, la autorización por rol, el uso de secretos sin exponer su valor y la escritura en la base.

@@ -41,7 +41,7 @@ En el código, AuthenticationPolicy, AuthorizationPolicy y SecretProvider son **
 | Por rol | S03 a S05 (ADMIN), S11 y S16 (CLIENTE), S14 y S15 (DESPACHO o ADMIN), S19 (DUENO o ADMIN) | Sesión vigente y rol permitido. El servicio vuelve a revisar el rol |
 | Front estático | `GET /`, `/*.html`, `/js/*`, `/css/*`, `/img/*` | Nada: son archivos públicos. Solo se sirven archivos de la carpeta `frontend/` |
 | Internas (no expuestas) | `/interno/*` de inventory y orders, `/introspect` y `/logout` de auth, `/graphql` de graphql-gateway, `/health` de cada servicio | No están en la lista blanca: desde fuera responden 404 |
-| Anónimas con límite estricto | S09, S09V (clients) y S06 (login) | Límite por IP en el gateway (10 y 20 por minuto) contra registros masivos y fuerza bruta; 429 `RATE_LIMITED` |
+| Anónimas con límite estricto | S09, S09V (clients) y S06 (login) | Límite por IP en el gateway (10 y 20 por minuto) contra registros masivos y fuerza bruta; 429 `RATE_LIMITED`. Limitación conocida: entrando por el 8080, el gateway ve todas las solicitudes con la IP del nginx, así que el límite de login y registro queda compartido entre todos los usuarios del front. Con varias réplicas iría en Redis y se usaría `X-Forwarded-For` desde una IP de confianza |
 
 ## 4. Fronteras de confianza
 
@@ -165,11 +165,11 @@ Otras denegaciones que corta el gateway antes de llegar al servicio: sin cookie 
 
 Desde el PR #48 cada contenedor deja una línea por paso, todas con el mismo `request_id`, para seguir una solicitud de punta a punta en el video. Se ven con `sh scripts/logs.sh <request_id>` (o `.\scripts\logs.ps1 <request_id>` en Windows), que muestra primero la línea del frontend y después el resto ordenado por hora. Ningún log registra tokens, cookies, contraseñas ni valores de secretos: solo nombres de claves.
 
-**Caso:** un CLIENTE crea un pedido (S11) desde `http://localhost:8080`. Eventos en el orden en que el código los escribe:
+**Caso:** un CLIENTE crea un pedido (S11) desde `http://localhost:8080`. Eventos en el orden en que ocurren:
 
 | # | Contenedor | Evento | Qué muestra |
 |---|---|---|---|
-| 1 | frontend | `api_proxied` | Método, ruta, estado, `proxy_to: gateway:8000` y el `request_id` que devolvió el gateway |
+| 1 | frontend | `api_proxied` | Método, ruta, estado, `proxy_to: gateway:8000` y el `request_id` que devolvió el gateway. nginx escribe esta línea al final, cuando termina la respuesta; `logs.sh` la muestra primero a propósito, porque es por donde entra la solicitud |
 | 2 | gateway | `auth_validation_requested` | Que pide validar la sesión a auth (`/introspect`) antes de enrutar |
 | 3 | gateway | `secret_loaded` | Solo si el secreto no estaba en caché (60 s): lee `secret/gateway` y registra los nombres de las claves |
 | 4 | auth | `gateway_secret_ok` | auth aceptó el secreto del gateway |
@@ -182,6 +182,8 @@ Desde el PR #48 cada contenedor deja una línea por paso, todas con el mismo `re
 | 11 | gateway | `routed` | Servicio destino, URL interna, estado que respondió y tiempo en ms |
 
 Además, cada servicio escribe al final su línea `request` (método, ruta, estado y ms); inventory aparece solo con esa línea, por la reserva de stock (`POST /interno/reservas`) que pide orders.
+
+Este recorrido se ve completo, del paso 2 al 11, en `evidencias/u2/pytest/logs.txt` (E07) con `request_id` `p06-fb85d8c9`, y el rechazo por rol con `p03-43744f5a`. Esas pruebas llaman al gateway directo en el 8000, así que no tienen la línea del frontend.
 
 Como la caché del secreto dura 60 segundos, `secret_loaded` casi nunca aparece en solicitudes seguidas y `secret_used` sale casi siempre con `origen: cache`. Para que se vea la lectura desde Vault en el video, se reinicia el gateway (`docker compose restart gateway`) justo antes de crear el pedido.
 
