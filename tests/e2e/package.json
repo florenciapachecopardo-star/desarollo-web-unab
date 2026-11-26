@@ -1,0 +1,11 @@
+{
+  "name": "chocomania-e2e",
+  "private": true,
+  "description": "Recorridos críticos de la Entrega 3 desde el navegador (Playwright)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1"
+  }
+}

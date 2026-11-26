@@ -125,7 +125,9 @@ services:
     profiles: ["herramientas"]
     volumes:
       - ./tests/api:/tests:ro
-      - ./evidencias/u2/pytest:/salida
+      # Por defecto escribe en la carpeta de la U2; scripts/u3-run.sh la cambia con PYTEST_SALIDA
+      # para no sobrescribir la evidencia E07 de la Entrega 2
+      - ./evidencias/${PYTEST_SALIDA:-u2/pytest}:/salida
     environment:
       BASE_URL: http://gateway:8000
       INVENTORY_URL: http://inventory:8000
@@ -153,6 +155,26 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+
+  # Recorridos críticos de la Entrega 3 desde el navegador (Playwright, tests/e2e).
+  # Lo ejecuta scripts/u3-run.sh por fases; a mano:
+  #   RUN=RUN99 FASE=normal docker compose run --rm --no-deps e2e --grep-invert "@caido|@recuperado|@demora|@expira"
+  # --no-deps es obligatorio: sin él, Compose levantaría inventory en la fase "caido".
+  # Entra por el contenedor frontend, igual que una persona en http://localhost:8080.
+  e2e:
+    build: ./tests/e2e
+    image: chocomania-e2e:dev
+    profiles: ["herramientas"]
+    working_dir: /e2e
+    volumes:
+      - ./tests/e2e:/e2e/codigo:ro
+      - ./evidencias/u3:/salida
+    environment:
+      BASE_URL: http://frontend
+      FASE: ${FASE:-normal}
+      SALIDA: /salida/${RUN:-RUN-sin-id}/playwright
+      AUTH_TOKEN_TTL_PRUEBA: ${AUTH_TOKEN_TTL:-900}
+    networks: [publica]
 
   # Perfil de clientes (S09, S10). Las credenciales siguen en auth.
   clients:
