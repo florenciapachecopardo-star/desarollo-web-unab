@@ -23,6 +23,7 @@ CUENTAS = {
     "cliente1": ("cliente@correo.cl", "Cliente2026"),
     "cliente2": ("diego@correo.cl", "Diego2026"),
     "admin": ("admin@chocomania.cl", "Admin2026"),
+    "despacho": ("despacho@chocomania.cl", "Despacho2026"),
 }
 
 DESPACHO = {"direccion": "Calle Ficticia 1", "comuna": "Providencia", "telefono": None}
@@ -82,6 +83,16 @@ def cliente1():
 @pytest.fixture(scope="session")
 def cliente2():
     return iniciar_sesion("cliente2")
+
+
+@pytest.fixture(scope="session")
+def despacho():
+    return iniciar_sesion("despacho")
+
+
+@pytest.fixture(scope="session")
+def admin():
+    return iniciar_sesion("admin")
 
 
 def stock_de(sesion: Sesion, producto_id: str) -> int:

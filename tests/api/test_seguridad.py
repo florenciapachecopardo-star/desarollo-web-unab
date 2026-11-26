@@ -180,3 +180,22 @@ def test_graphql_rechaza_consulta_muy_profunda(cliente1):
     assert cuerpo.get("errors"), "la consulta profunda deberia traer errores"
     assert not cuerpo.get("data"), "no deberia devolver datos"
     print(f"[gql-profundidad] error: {cuerpo['errors'][0]['message']}")
+
+
+# ---------- INC07: S15 no revela el estado de un pedido que el rol no puede ver ----------
+
+def test_inc07_despacho_no_ve_estado_de_pedido_sin_pagar(despacho, admin):
+    # PED-0002 esta PENDIENTE_PAGO: DESPACHO no lo ve en S12, asi que S15 debe responder igual (404)
+    r = despacho.pedir("PATCH", f"/api/v1/pedidos/{PEDIDO_CLIENTE2}/estado", "inc07-despacho",
+                       json={"estado": "ENTREGADO"})
+    assert_error(r, 404, "ORDER_NOT_FOUND")
+    assert "PENDIENTE_PAGO" not in r.text
+    # Mismo resultado que en S12
+    r = despacho.pedir("GET", f"/api/v1/pedidos/{PEDIDO_CLIENTE2}", "inc07-despacho-s12")
+    assert_error(r, 404, "ORDER_NOT_FOUND")
+    # ADMIN si ve el pedido: el salto invalido sigue dando 409 y el pedido no cambia
+    r = admin.pedir("PATCH", f"/api/v1/pedidos/{PEDIDO_CLIENTE2}/estado", "inc07-admin",
+                    json={"estado": "ENTREGADO"})
+    assert_error(r, 409, "TRANSICION_INVALIDA")
+    r = admin.pedir("GET", f"/api/v1/pedidos/{PEDIDO_CLIENTE2}", "inc07-admin-s12")
+    assert r.status_code == 200 and r.json()["estado"] == "PENDIENTE_PAGO"

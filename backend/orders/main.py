@@ -400,7 +400,9 @@ async def cambiar_estado(id: str, datos: CambioEstado, request: Request, quien: 
     )
     if actualizado is None:
         pedido = await pedidos.find_one({"_id": id})
-        if pedido is None:
+        # INC07: si el rol no puede ver el pedido (S12), se responde igual que si no existiera,
+        # para no revelar su estado. ADMIN sigue recibiendo 409 con el estado actual.
+        if pedido is None or not puede_ver(quien, pedido):
             raise no_encontrado()
         raise ApiError(409, "TRANSICION_INVALIDA",
                        f"No se puede pasar de {pedido['estado']} a {nuevo}")
