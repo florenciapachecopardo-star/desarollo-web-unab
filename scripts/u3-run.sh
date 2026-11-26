@@ -37,7 +37,10 @@ mkdir -p "$DIR/logs"
 export RUN
 
 ahora_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-ahora_local() { TZ=America/Santiago date "+%Y-%m-%d %H:%M:%S %z (America/Santiago)"; }
+# Hora local del computador con su desfase (en Chile, -0300 en verano). No se pone el
+# nombre de la zona: Git Bash no reconoce "America/Santiago" y mostraba UTC con esa
+# etiqueta (corregido después de RUN01)
+ahora_local() { date "+%Y-%m-%d %H:%M:%S %z (hora del computador)"; }
 paso() { echo; echo "=== $* ($(ahora_local))"; echo "$(ahora_local)  $*" >> "$DIR/bitacora-run.txt"; }
 
 SERVICIOS="frontend gateway auth clients inventory orders payments graphql-gateway"
@@ -163,7 +166,13 @@ cat "$DIR/revision-credenciales.txt"
   echo "Fin: $(ahora_local)"
   for junit in "$DIR"/playwright/*/junit.xml "$DIR"/pytest/junit.xml; do
     [ -e "$junit" ] || continue
-    echo "$junit: $(grep -o 'tests="[0-9]*" failures="[0-9]*" skipped="[0-9]*" errors="[0-9]*"' "$junit" | head -1)"
+    # Lee cada atributo por separado: pytest y Playwright los escriben en distinto orden
+    linea=$(grep -o '<testsuites [^>]*>\|<testsuite [^>]*>' "$junit" | head -1)
+    conteo=""
+    for attr in tests failures skipped errors; do
+      conteo="$conteo $attr=$(echo "$linea" | grep -o " $attr=\"[0-9]*\"" | grep -o '[0-9]*')"
+    done
+    echo "$junit:$conteo"
   done
 } >> "$DIR/resumen-fases.txt"
 paso "Listo"

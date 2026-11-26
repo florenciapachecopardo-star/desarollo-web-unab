@@ -90,7 +90,7 @@ test.describe("F04 Compra completa (cliente)", () => {
 test.describe("F04 Rechazos y reintentos (cliente con sesión)", () => {
     test.use({ storageState: RUTA_SESION_CLIENTE1 });
 
-    test("P-U3-04 F04 rechazo: dirección vacía no llama al servidor y cantidad mayor al stock no crea pedido",
+    test("P-U3-04 F04 rechazo: dirección vacía no llama al servidor; cantidad fuera de rango o mayor al stock no crea pedido",
         async ({ page, api, evidencia }) => {
             const antes = await totalPedidos(api);
             const creaciones = [];
@@ -106,8 +106,24 @@ test.describe("F04 Rechazos y reintentos (cliente con sesión)", () => {
             expect(creaciones).toHaveLength(0);
             await evidencia.captura(page, "a-sin-direccion");
 
-            // b) Regla del servidor: 999 unidades de un producto con stock 15
+            // b) Cantidad fuera del contrato de S11 (1 a 20 por línea): 422 VALIDATION_ERROR
+            //    (versión 1.0 esperaba 409 con 999 unidades: ver INC08 y protocolo §8)
             await page.evaluate((id) => localStorage.setItem("choco:carrito", JSON.stringify([{ id, cantidad: 999 }])), PRODUCTOS.BLANCO.id);
+            await page.goto("checkout.html");
+            await page.locator("#direccion").fill("Calle Ficticia 123");
+            const [resp422] = await Promise.all([
+                page.waitForResponse(esCrearPedido),
+                page.locator("#form-checkout button[type=submit]").click()
+            ]);
+            expect(resp422.status()).toBe(422);
+            const cuerpo422 = await resp422.json();
+            expect(cuerpo422.error.code).toBe("VALIDATION_ERROR");
+            await expect(page.locator("#error")).toContainText(`Código: ${cuerpo422.error.request_id}`);
+            await expect(page).toHaveURL(/checkout\.html/);
+            await evidencia.captura(page, "b-cantidad-fuera-de-rango");
+
+            // c) Regla de stock: 16 unidades (dentro del contrato) de un producto con stock 15
+            await page.evaluate((id) => localStorage.setItem("choco:carrito", JSON.stringify([{ id, cantidad: 16 }])), PRODUCTOS.BLANCO.id);
             await page.goto("checkout.html");
             await page.locator("#direccion").fill("Calle Ficticia 123");
             const [resp] = await Promise.all([
@@ -120,7 +136,7 @@ test.describe("F04 Rechazos y reintentos (cliente con sesión)", () => {
             // El mensaje queda en pantalla con el código de la solicitud, y no se avanza al pago
             await expect(page.locator("#error")).toContainText(`Código: ${cuerpo.error.request_id}`);
             await expect(page).toHaveURL(/checkout\.html/);
-            await evidencia.captura(page, "b-sin-stock");
+            await evidencia.captura(page, "c-sin-stock");
 
             // No quedó ningún pedido creado y el stock no cambió
             expect(await totalPedidos(api)).toBe(antes);

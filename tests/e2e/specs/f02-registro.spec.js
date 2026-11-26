@@ -60,8 +60,10 @@ test.describe("F02 Registro", () => {
             ]);
             expect(resp.status()).toBe(201);
             const idCliente = new URL(page.url()).searchParams.get("id");
+            // La página muestra "------" hasta que carga el código: se espera a que aparezca
+            // (versión 1.0 lo leía de inmediato: ver INC09)
+            await expect(page.locator("#codigo-mostrado")).toHaveText(/^[0-9]{6}$/);
             const codigo = (await page.locator("#codigo-mostrado").textContent()).trim();
-            expect(codigo).toMatch(/^[0-9]{6}$/);
             await evidencia.captura(page, "2-verificar");
 
             // c) Antes de verificar, la cuenta no puede iniciar sesión
