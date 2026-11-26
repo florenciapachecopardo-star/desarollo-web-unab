@@ -97,6 +97,22 @@ docker compose run --rm seed --reset      # o: scripts/reset.sh
 
 El protocolo completo está en [`docs/protocolo-pruebas.md`](docs/protocolo-pruebas.md), y la relación entre requisitos, pantallas, servicios y pruebas, en [`docs/matriz-requisitos.md`](docs/matriz-requisitos.md).
 
+## Pruebas de la Entrega 3 (integración validada)
+
+Una ejecución completa (RUN) se hace con un solo comando, desde la raíz del repo. En Windows, con **Git Bash**:
+
+```bash
+sh scripts/u3-run.sh RUN01 "Tu nombre"
+```
+
+Tarda unos 6 a 8 minutos. Levanta el sistema, restaura los datos y corre los recorridos críticos desde el navegador (Playwright, en escritorio y móvil emulado) en cinco fases: todo arriba, inventory caído, inventory de vuelta, inventory lento y sesión expirada. Después corre pytest, junta los logs de cada `X-Request-ID` que vio el navegador y revisa en Mongo los pedidos creados. Todo queda en `evidencias/u3/RUN01/`; abre `playwright/normal/reporte-html/index.html` para ver cada prueba con sus capturas.
+
+- Cada RUN usa un ID nuevo (RUN01, RUN02…). El script no deja sobrescribir una carpeta existente.
+- La primera vez descarga la imagen de Playwright (~2 GB).
+- Para correr solo una fase a mano: `RUN=RUN99 FASE=normal docker compose run --rm --no-deps e2e --grep-invert "@caido|@recuperado|@demora|@expira"` (el `--no-deps` es obligatorio).
+
+Línea base, inventario de flujos, protocolo y matriz de trazabilidad: [`docs/u3/`](docs/u3/).
+
 ## Lo que no está en esta entrega
 
-El panel interno (sus servicios funcionan por API y se probaron en E10, pero no tiene pantallas), el envío de la boleta por correo, la verificación de correo con una API de mensajería real (el código se muestra en pantalla) y las pruebas con Playwright. El pago usa un proveedor simulado, no Webpay. El detalle y los motivos están en la sección "Brechas declaradas" de [`docs/informe.md`](docs/informe.md).
+El panel interno (sus servicios funcionan por API y se probaron en E10, pero no tiene pantallas), el envío de la boleta por correo, la verificación de correo con una API de mensajería real (el código se muestra en pantalla). Las pruebas con Playwright se agregaron en la Entrega 3. El pago usa un proveedor simulado, no Webpay. El detalle y los motivos están en la sección "Brechas declaradas" de [`docs/informe.md`](docs/informe.md).

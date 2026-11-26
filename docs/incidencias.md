@@ -10,6 +10,14 @@ Cada incidencia usa el prefijo `INC` seguido de un número correlativo. El prefi
 | INC04 | 2026-11-08 | Revisión del código de inventory para el M1 | En `/interno/reservas`, si un pedido trae un producto válido y luego uno con ID mal formado, se responde 400 sin devolver el stock ya descontado del primero | — (revisión de código) | Resuelta | `cffe475` (INCR-23): inventory valida todos los ID antes de descontar. `test_inc04_id_mal_formado_no_descuenta_stock` pasa (E07, `inc04-7853e5b1`) |
 | INC05 | 2026-11-08 | Revisión del front para el M7 | El registro local guarda los datos del cliente y su contraseña en texto plano en localStorage | — | **Resuelta** con el servicio clients (S09, S09V, S10): el front ya no guarda cuentas ni claves | Resuelta el 9 de noviembre con `backend/clients` |
 | INC06 | 2026-11-08 | Prueba de carga del catálogo (k6, M9) | El catálogo no cumplió los umbrales: p95 de 3.163 ms (umbral 500 ms) y 22,2 solicitudes por segundo (umbral 25). Causa: el gateway creaba un `httpx.AsyncClient` nuevo en cada solicitud, lo que saturaba su CPU | — (prueba de carga, 3.019 solicitudes) | Resuelta | `3c8d960`: un solo cliente HTTP para todo el gateway. Nueva medición: p95 de 19,2 ms y 65 solicitudes por segundo, sin cambiar los umbrales (E08) |
-| INC07 | 2026-11-09 | Revisión de la evidencia E10 | En S15, si DESPACHO intenta mover un pedido sin pagar, recibe 409 con el estado actual ("No se puede pasar de PENDIENTE_PAGO a ENTREGADO"), aunque en S12 ese mismo pedido le responde 404. No expone datos del cliente ni montos | `5fe9266d56ba466f8f9f2102e1631604` | Declarada como brecha | En la U3, S15 debería responder 404 cuando el pedido no es visible para el rol (mismo criterio que S12) |
+| INC07 | 2026-11-09 | Revisión de la evidencia E10 | En S15, si DESPACHO intenta mover un pedido sin pagar, recibe 409 con el estado actual ("No se puede pasar de PENDIENTE_PAGO a ENTREGADO"), aunque en S12 ese mismo pedido le responde 404. No expone datos del cliente ni montos | `5fe9266d56ba466f8f9f2102e1631604` | **Corregida, pendiente de validar** | U2: declarada como brecha. U3: causa confirmada en el código: `cambiar_estado` (S15) buscaba el pedido para armar el 409 sin aplicar `puede_ver`, la regla que usa S12. Corrección en `a6ae451`: si el rol no puede ver el pedido, responde 404 `ORDER_NOT_FOUND`; ADMIN sigue con 409. Prueba nueva `test_inc07_despacho_no_ve_estado_de_pedido_sin_pagar` (P-U3-API). Cambio de criterio de C12 anotado en `docs/u3/protocolo-u3.md` §8. **Pasa a Resuelta solo cuando la prueba apruebe en RUN01 y RUN02**, con regresión de las demás pruebas |
 
-**Estados posibles:** Abierta, En revisión, Resuelta, Declarada como brecha.
+**Estados posibles:** Abierta, En revisión, Corregida pendiente de validar, Resuelta, Declarada como brecha.
+
+## Entrega 3
+
+Las incidencias nuevas de la U3 se agregan aquí abajo, con la RUN y la evidencia donde se detectaron. Cada una se cierra solo con una RUN posterior que la compruebe; la RUN donde falló **no se borra**.
+
+| ID | Fecha | RUN y evidencia de origen | Síntoma e impacto | Pasos para reproducir | Esperado | Prioridad | Causa (confirmada o hipótesis) | Corrección (commit) | RUN de validación y regresión | Estado |
+|---|---|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | | | |

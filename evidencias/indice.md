@@ -19,6 +19,9 @@ Cada evidencia tiene su ficha, hecha con `evidencias/plantilla-ficha.md`. Las de
 
 ## Entrega 3 (U3)
 
-| ID | Qué demuestra | Módulo | Ficha | Captura o archivo |
-|---|---|---|---|---|
-| | | | | |
+Cada RUN es una carpeta `evidencias/u3/RUNxx/` creada por `sh scripts/u3-run.sh RUNxx "<ejecutora>"`, con su ficha (`evidencias/plantilla-ficha-u3.md`). Dentro de una RUN, las fuentes se numeran `E-RUNxx-01`, `E-RUNxx-02`… como indica la plantilla. Una RUN nunca se borra ni se reemplaza, aunque falle.
+
+| RUN | Versión (commit) | Fecha | Ejecutora | Qué cubre | Resultado | Ficha |
+|---|---|---|---|---|---|---|
+| RUN01 | | | | P-U3-01 a P-U3-16 en escritorio y móvil, y P-U3-API | pendiente | `u3/RUN01/ficha.md` |
+| RUN02 | | | | Igual que RUN01, independiente, desde el estado inicial | pendiente | `u3/RUN02/ficha.md` |
